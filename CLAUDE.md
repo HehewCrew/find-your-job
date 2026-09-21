@@ -66,7 +66,8 @@ jobs/
     phase.py   The /jobhunt phase table as a pure function
     paths.py   Every file the UI touches, so tests can point it at tmp_path
     setup.py   Setup tab: status, load, validated save (+ .bak), guided profile, CV preview
-    static/    index.html, app.css, app.js (daily loop), setup.js (forms), bundled font (OFL)
+    static/    index.html, app.css, app.js (daily loop), setup.js (forms), apps.js
+               (Applications tab), bundled font (OFL)
   targets.json Greenhouse/Lever/Ashby company boards to poll
   priorities.md  Apply / don't-apply criteria, read in triage  (gitignored; .example tracked)
 TODAY_SCRAPING.md    Today's leads, awaiting [x]/[-]  (regenerated each scrape)
@@ -196,3 +197,10 @@ repo. Don't answer it by describing the state; run the skill.
   profile variant (`check_profile`) before anything is written.
 - Setup keeps `<file>.bak` on every save. The four `.bak` names are in `.gitignore` next to the
   files they back up - add the `.bak` too if a fifth personal file ever joins Setup.
+- **Field edits go through `Application.update()`**, which validates like `__post_init__`
+  (company/role non-empty, status normalised, date checked) and changes nothing if any field is
+  bad. The UI uses it; the CLI's `update` still sets attributes directly - switch it over rather
+  than adding a third path.
+- "Quiet" (`Application.is_quiet`, `QUIET_DAYS = 14`) is measured from `updated_at`, not
+  `applied_on`: a note or a status change resets it. The Applications tab's writes are refused
+  while a `build` task runs, because `pick.run` saves the same store from its worker thread.

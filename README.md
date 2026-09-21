@@ -73,7 +73,9 @@ It opens `http://127.0.0.1:8765/` and walks through the day in five steps - **Sc
 **Review** (tick leads with `x`, drop them with `-`, move with `j`/`k`), **Build** the CVs,
 **Apply**, and **Close** the day - opening on the step you are at. **Paste a job** takes a
 posting the scrape never saw. Each CV has **Open** and **Show in folder**, for attaching it to
-an application form.
+an application form. **Applications** lists everything you have tracked - filter, search, edit,
+add notes, export to CSV - and flags open applications that have gone quiet for two weeks, with
+one-click **No reply** and **Heard back**. **Setup** edits your four personal files as forms.
 
 Only your own computer can reach the page; press Ctrl+C in its window to stop it. The page and
 the command line work on the same files, so you can switch between them in the middle of a
