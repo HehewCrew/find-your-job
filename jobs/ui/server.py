@@ -35,6 +35,8 @@ from jobs.ui.tasks import Busy, TaskRunner
 from jobtrack.models import ValidationError
 
 STATIC = Path(__file__).resolve().parent / "static"
+# A pasted job description or a whole profile.json fits in this many times over.
+MAX_BODY = 2_000_000
 TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
@@ -91,9 +93,22 @@ class _Handler(BaseHTTPRequestHandler):
     def _json(self, status: int, payload) -> None:
         self._send(status, json.dumps(payload).encode(), "application/json; charset=utf-8")
 
-    def _body(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(length) if length else b"{}"
+    def _read_body(self) -> bytes | None:
+        """The whole request body, read before any answer is sent - None if it is too big.
+
+        Answering first and closing a socket with unread data makes Windows send a reset,
+        and the page then sees a network error instead of the 403 or 400 it was sent.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if length > MAX_BODY:
+            return None
+        return self.rfile.read(length) if length > 0 else b""
+
+    @staticmethod
+    def _parse(raw: bytes) -> dict:
         try:
             data = json.loads(raw or b"{}")
         except json.JSONDecodeError as exc:
@@ -207,6 +222,11 @@ class _Handler(BaseHTTPRequestHandler):
     # -- POST -------------------------------------------------------------------------
 
     def do_POST(self) -> None:
+        raw = self._read_body()
+        if raw is None:
+            self._json(413, {"error": "That request is too large."})
+            self.close_connection = True
+            return
         if not self._host_ok():
             self._json(403, {"error": "This server only answers to 127.0.0.1."})
             return
@@ -217,7 +237,7 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
 
         def route():
-            b = self._body()
+            b = self._parse(raw)
             if path == "/api/leads/mark":
                 return api.mark_lead(a.paths, str(b.get("url", "")), str(b.get("mark", "")))
             if path == "/api/scrape":

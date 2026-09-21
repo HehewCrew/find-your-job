@@ -305,3 +305,27 @@ def test_applications_csv_is_a_download(app):
     assert resp.getheader("Content-Type").startswith("text/csv")
     assert resp.getheader("Content-Disposition").startswith('attachment; filename="applications-')
     assert "Acme" in body and "Globex" not in body
+
+
+def test_a_refused_post_still_reads_its_body_so_the_client_gets_the_403(app):
+    """Answering before the body was read closes a socket with unread data; on Windows that
+    is a reset, and the client saw ConnectionAbortedError instead of the 403 (a flaky test
+    once in ~50 runs, and a page that would have shown a network error)."""
+    srv, *_ = app
+    big = {"text": "x" * 300_000}
+    for _ in range(10):
+        assert call(srv, "POST", "/api/paste/assess", big, token=None)[0] == 403
+
+
+def test_an_oversized_body_is_refused(app):
+    srv, *_ = app
+    port = srv.server_address[1]
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.putrequest("POST", "/api/scrape", skip_host=True)
+    conn.putheader("Host", f"127.0.0.1:{port}")
+    conn.putheader("X-FYJ-Token", TOKEN)
+    conn.putheader("Content-Length", str(server.MAX_BODY + 1))
+    conn.endheaders()
+    resp = conn.getresponse()
+    assert resp.status == 413
+    conn.close()
