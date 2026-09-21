@@ -1,6 +1,6 @@
 # Core refactor: `jobs/` returns data — design
 
-Date: 2026-09-21. Status: approved in brainstorming, awaiting spec review.
+Date: 2026-09-21. Status: implemented on branch `core-refactor`; amended below to what was built.
 
 ## Context
 
@@ -43,10 +43,10 @@ the CLI layer.
 |---|---|---|
 | `jobs.progress` (new) | — | `Progress`, `Report` (below) |
 | `jobs.tailor` | `fit(t, report=None)` | `CvResult` |
-| `jobs.brief` | `mark(path, selectors, state, reason)`, `close(path, root, store, *, force, keep_cvs, dry_run)` | `MarkResult`, `CloseResult` |
+| `jobs.brief` | `mark_briefs(path, selectors, state, reason)` (`mark` was taken by the line-rewriting helper), `close(path, root, store, *, force, keep_cvs, dry_run)` | `MarkResult`, `CloseResult` |
 | `jobs.paste` | `assess(...)` (exists), `build(assessment, *, force, save, store, report=None)` | `PasteResult`; raises `Skipped` |
-| `jobs.pick` | `run(selectors, *, sheet, data, briefs, store, dry_run, report=None)` | `PickResult` |
-| `jobs.scrape` | `run(*, sources, min_score, limit, save, cv, json_path, store, include_tracked, report=None)` | `ScrapeResult` |
+| `jobs.pick` | `choose(leads, selectors, sheet_name)`, then `run(taken, dropped, *, briefs, store, report=None)` | `(taken, dropped)`, `PickResult` |
+| `jobs.scrape` | `run(*, sources, min_score, store, include_tracked, report=None)` — `--save`/`--cv`/`--json` stay in `main`, after the table | `ScrapeResult` |
 
 All results are dataclasses defined in the module that produces them.
 
@@ -71,8 +71,7 @@ class CvResult:
 - `CloseResult`: `filed: list[Filed]`, `dropped: list[tuple[Brief, int]]`, `swept: list[Path]`,
   `log_path`, `dry_run`.
 - `ScrapeResult`: `raw: int`, `problems: list[str]`, `leads: list[Scored]`, `sheet: Path | None`,
-  `boards: int`, `pruned: int`, `example_settings: bool`, `saved: list[Application]`,
-  `cvs: list[CvResult]`.
+  `boards: int`, `pruned: int`, `example_settings: bool`.
 
 The exact field lists may grow during implementation if `main` needs something to print;
 they may not shrink below what is listed.
@@ -138,8 +137,8 @@ Other `to_pdf` callers (`cv/build.py`'s own `main`) keep their current `--keep-d
 Only the code under `to_pdf` changes:
 
 - `_word_to_pdf`, `_libreoffice_to_pdf`, `_report_oversized` and the `build_variant` "no
-  bullets tagged" warning stop printing and append to a `warnings` list the caller passes in.
-  `cv/build.py`'s `main` prints that list, so its output is unchanged.
+  bullets tagged" warning append to a `warnings` list when the caller passes one, and
+  print to stderr as before when it does not - so `cv/build.py`'s `main` is unchanged.
 - `to_pdf` reports which engine produced each PDF.
 - `_word_to_pdf` calls `pythoncom.CoInitialize()` / `CoUninitialize()` when it is not on the
   main thread. From the CLI this does nothing; from a UI worker thread it is what makes Word
@@ -184,7 +183,7 @@ For each module, in this order:
    records into a list), and the exceptions raised.
 3. `fit` is tested with a fake `to_pdf` that reports page counts, so the trimming loop is
    covered without Word.
-4. The existing suite (315 tests, including `tests/test_score.py` on the Tunisia fixture)
+4. The existing suite (500 tests at the start, including `tests/test_score.py` on the Tunisia fixture)
    stays green at every commit. `ruff check . && ruff format --check .` passes.
 
 ## Order

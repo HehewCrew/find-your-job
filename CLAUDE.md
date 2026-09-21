@@ -57,6 +57,8 @@ jobs/
   pick.py      Build CVs for the ticked leads, feed jobtrack, append to BRIEFS.md
   paste.py     Verdict on a hand-pasted JD, then a tailored CV; appends to BRIEFS.md
   brief.py     Mark BRIEFS.md applied/aborted, then file it into applied/
+  progress.py  Progress events for long jobs (scrape, pick, paste)
+  errors.py    JobsError / Skipped - raised by run functions, mapped to exit 1 by main
   targets.json Greenhouse/Lever/Ashby company boards to poll
   priorities.md  Apply / don't-apply criteria, read in triage  (gitignored; .example tracked)
 TODAY_SCRAPING.md    Today's leads, awaiting [x]/[-]  (regenerated each scrape)
@@ -99,7 +101,12 @@ repo. Don't answer it by describing the state; run the skill.
   If a third-party runtime dependency seems necessary, ask first.
 - **Layers don't skip.** `cli.py` calls `storage`/`report`; `storage` uses `models`;
   `models` depends on nothing internal. Keep it that way.
-- **No printing outside `cli.py`.** Other modules return strings or raise.
+- **No printing outside `cli.py` or a module's `main()`.** Other functions return data
+  or raise; long jobs report through `jobs.progress`. Each `jobs/` command is a
+  `run`-style function (`scrape.run`, `pick.run`, `paste.build`, `brief.close`, ...)
+  plus a `main` that prints its result - the UI calls the former. `jobs/errors.py`
+  holds the "nothing to do" errors `main` turns into exit 1. `tests/golden/` pins
+  the CLI's exact output; a diff there is a behaviour change, not noise.
 - **Validation lives in `models.py`** and raises `ValidationError`; `cli.main` catches it
   and exits 2. Don't scatter `sys.exit` calls through command functions.
 - Exit codes: `0` success, `1` not found / no results, `2` invalid input.
@@ -134,8 +141,10 @@ repo. Don't answer it by describing the state; run the skill.
   CV is its folder, so the file can be attached to a form without renaming it. A tailored CV
   therefore lands in `cv/out/tailored/<posting-slug>/`, one folder per application, and
   `close` prunes that folder once the CV is filed. The slug used to be a `__<slug>` filename
-  suffix; `brief.parse_cv` and `brief._cv_for` still read that older shape, so don't drop the
-  fallbacks while a pre-change BRIEFS.md or CV could still be lying around.
+  suffix; `brief.parse_cv` and `brief._cvs_for` still read that older shape, so don't drop the
+  fallbacks while a pre-change BRIEFS.md or CV could still be lying around. A tailored
+  folder holds the `.docx` always and the `.pdf` when Word or LibreOffice exists; `close`
+  files and sweeps both.
 - `review.read_sheet` joins the markdown to its JSON sidecar **by URL, not by index**, so a
   section deleted or reordered by hand can't tailor a CV against a different posting. Keep
   the `- **Link:**` line in `_block()` if you change the sheet layout; it's the join key.
