@@ -44,6 +44,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from jobs import llm, settings  # noqa: E402
 from jobs import tailor as tl  # noqa: E402
 from jobs.brief import BRIEFS_PATH  # noqa: E402
+from jobs.errors import Skipped  # noqa: E402
+from jobs.progress import Report, emit  # noqa: E402
 from jobs.score import Scored, _families, pick_variant, score  # noqa: E402
 from jobs.sources import Posting  # noqa: E402
 from jobtrack.models import Application, ValidationError  # noqa: E402
@@ -182,6 +184,7 @@ def assess(
     variant: str = "",
     use_llm: bool = True,
     cfg: settings.Settings | None = None,
+    report: Report | None = None,
 ) -> Assessment:
     """Everything `paste` decides, without printing or building anything."""
     cfg = cfg or settings.current()
@@ -205,12 +208,71 @@ def assess(
         cv=llm.describe_cv(profile(), t["variant"]),
         rules=a.rules,
     )
+    emit(report, "llm", f"Asking {client.provider} for a verdict…", detail=True)
     a.conversation = llm.Conversation(client, opening)
     try:
         a.model = a.conversation.verdict()
     except llm.LLMError as exc:
         a.llm_error = str(exc)
     return a
+
+
+@dataclass
+class PasteResult:
+    assessment: Assessment
+    cv: tl.CvResult
+    forced: bool
+    app_id: int | None
+    briefs_path: Path
+
+
+def build(
+    a: Assessment,
+    text: str,
+    *,
+    force: bool = False,
+    save: bool = False,
+    store: Store | None = None,
+    briefs: Path = BRIEFS_PATH,
+    report: Report | None = None,
+) -> PasteResult:
+    """Tailor the CV, append the brief, save the JD, and optionally track it.
+
+    A skip verdict raises Skipped unless `force`: you found the posting, the verdict
+    advises, and forcing is the explicit override.
+    """
+    forced = a.verdict.decision == "skip"
+    if forced and not force:
+        raise Skipped(a)
+    t = a.tailor
+    emit(report, "tailor", f"Tailoring the {t['variant']} CV for {t['company']}…")
+    cv = tl.fit(t, report=report)
+    tl.append_briefs([t], briefs)
+    tl.write_jd(t["company"], t["job_title"], text, t["slug"])
+
+    app_id = None
+    if save:
+        # `is None`, not `or`: an empty Store is falsy, and would be swapped for the default.
+        store = store if store is not None else Store(default_path())
+        verdict = a.verdict
+        app = Application(
+            id=store.next_id(),
+            company=t["company"],
+            role=t["job_title"],
+            status="wishlist",
+            url=a.posting.url,
+            location=a.posting.location or "Remote",
+            notes=[
+                f"pasted by hand | cv: {t['variant']}",
+                f"verdict: {verdict.decision} ({verdict.source})"
+                + (" - tailored anyway" if forced else ""),
+                "source: paste",
+            ],
+        )
+        store.add(app)
+        store.save()
+        app_id = app.id
+    return PasteResult(a, cv, forced, app_id, briefs)
 
 
 def _print_verdict(v: llm.Verdict, heading: str) -> None:
@@ -353,20 +415,30 @@ def main(argv: list[str] | None = None) -> int:
         print("\n--dry-run: no CV built, nothing appended.")
         return 0
 
-    forced = a.verdict.decision == "skip"
-    if (
-        forced
+    confirmed = (
+        a.verdict.decision == "skip"
         and not args.force
-        and not (interactive and _confirm("\n  Verdict is skip. Tailor a CV anyway? [y/N] "))
-    ):
-        print("\n  Skipped - nothing built. Rerun with --force to tailor it anyway.")
+        and interactive
+        and _confirm("\n  Verdict is skip. Tailor a CV anyway? [y/N] ")
+    )
+    wanted = len(t["matched"])
+    try:
+        result = build(
+            a,
+            text,
+            force=args.force or confirmed,
+            save=args.save,
+            store=Store(args.store_file or default_path()) if args.save else None,
+            briefs=args.briefs,
+        )
+    except Skipped as exc:
+        print(f"\n  {exc}")
         return 1
 
-    wanted = len(t["matched"])
-    r = tl.fit(t)
-    made, pages, kept = ([r.pdf] if r.pdf else []), r.pages or 0, r.keywords_kept
+    cv = result.cv
+    kept = cv.keywords_kept
     if kept < wanted:
-        # The brief is written from `t` after this, so it reports what the CV really says.
+        # The brief was written from `t`, so it reports what the CV really says.
         detail = (
             f"kept the strongest {kept}"
             if kept
@@ -374,40 +446,21 @@ def main(argv: list[str] | None = None) -> int:
             "was left off - the CV is untailored apart from the folder it lands in"
         )
         print(f"\n  note: {wanted} keywords ran past {tl.MAX_PAGES} pages; {detail}.")
-    tl.append_briefs([t], args.briefs)
-    tl.write_jd(company, title, text, t["slug"])
-    for path in made:
-        print(f"\n  CV      -> {tl.display_path(path)}" + (f"  ({pages} pages)" if pages else ""))
+    pages = cv.pages or 0
+    if cv.pdf:
+        shown = tl.display_path(cv.pdf)
+        print(f"\n  CV      -> {shown}" + (f"  ({pages} pages)" if pages else ""))
     if pages > tl.MAX_PAGES:
         print(
             f"  !! still {pages} pages with no keyword block left to trim - "
             "check cv/profile.json before sending.",
             file=sys.stderr,
         )
-    if not made:
+    if not cv.pdf:
         print("  !  no PDF produced (Word unavailable); the .docx is in cv/out/tailored/")
     print(f"  Brief   -> appended to {tl.display_path(args.briefs)}")
-
-    if args.save:
-        store = Store(args.store_file or default_path())
-        verdict = a.verdict
-        app = Application(
-            id=store.next_id(),
-            company=company,
-            role=title,
-            status="wishlist",
-            url=args.url,
-            location=args.location or "Remote",
-            notes=[
-                f"pasted by hand | cv: {t['variant']}",
-                f"verdict: {verdict.decision} ({verdict.source})"
-                + (" - tailored anyway" if forced else ""),
-                "source: paste",
-            ],
-        )
-        store.add(app)
-        store.save()
-        print(f"  Tracked -> jobtrack #{app.id} (wishlist)")
+    if result.app_id is not None:
+        print(f"  Tracked -> jobtrack #{result.app_id} (wishlist)")
 
     print(f'\nNext: apply, then  python -m jobs.brief applied "{company}"')
     return 0

@@ -14,6 +14,13 @@ from jobtrack.models import Application  # noqa: E402
 from jobtrack.storage import Store  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def no_real_store(tmp_path, monkeypatch):
+    """Any code path that falls back to default_path() lands in tmp_path, never in the
+    repo's own applications.json - which is what one test once wrote to."""
+    monkeypatch.setenv("JOBTRACK_FILE", str(tmp_path / "default-applications.json"))
+
+
 @pytest.fixture
 def store_path(tmp_path):
     return tmp_path / "applications.json"
