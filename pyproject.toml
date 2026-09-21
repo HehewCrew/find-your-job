@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "jobtrack"
-version = "0.1.0"
-description = "A small CLI for tracking job applications."
+name = "find-your-job"
+version = "0.2.0"
+description = "Find job postings that fit you, tailor a CV to each, and track every application - locally."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

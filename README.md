@@ -1,5 +1,42 @@
 # Find Your Job
 
+Find job postings that fit you, build a CV tailored to each one, and keep track of every
+application - from a page in your browser, on your own computer. Free, and nothing leaves
+your machine unless you choose to use an AI verdict with your own key.
+
+## Get started
+
+1. **Install Python 3.10 or newer** from [python.org](https://www.python.org/downloads/).
+   On Windows, tick **"Add python.exe to PATH"** in the installer.
+2. **Get Find Your Job:** click the green **Code** button on this page, then
+   **Download ZIP**, and unzip it somewhere you'll find it again (Documents is fine).
+   Or, if you use git: `git clone` this repository.
+3. **Start it:**
+   - **Windows:** double-click `start.bat`
+   - **macOS:** double-click `start.command`
+   - **Linux:** run `./start.sh` in a terminal
+
+The first start takes a minute to set itself up, then your browser opens on **Setup**: a
+short form creates your CV profile, and three more describe what you are looking for. After
+that, **Today** walks you through the daily loop. Next time, just double-click again. To stop
+it, close the window that opened with it.
+
+**If your computer warns you** about running the file: on Windows click **More info → Run
+anyway**; on macOS right-click `start.command`, choose **Open**, then **Open** again. Both
+appear only because the file came from the internet.
+
+**Optional extras:**
+- **PDF CVs:** Microsoft Word (Windows) or the free [LibreOffice](https://www.libreoffice.org/download/download/).
+  Without either you get Word documents, and the two-page check is skipped.
+- **An AI second opinion** on postings you paste in: see [jobs/README.md](jobs/README.md#the-verdict-apply-consider-or-skip).
+
+**Your data stays in this folder** - your CV facts, your applications, the day's leads. To
+update the app, `git pull` if you cloned it; if you downloaded a ZIP, unzip the new version and
+copy these across from the old folder: `cv/profile.json`, `jobs/settings.json`,
+`jobs/priorities.md`, `cv/rules.md`, `applications.json` and the `applications/` folder.
+
+## What's inside
+
 A job-hunt toolchain in three parts, each usable on its own:
 
 | Part | What it does |
@@ -12,7 +49,10 @@ Nothing here needs a paid service, and the runtime is standard library only. The
 exception is opt-in: `jobs.paste` can ask an LLM of your choice for a verdict on a job
 description, with your own API key.
 
-## Setting it up for yourself
+## Setting it up by hand
+
+`start.bat` / `start.sh` do all of this for you. The rest of this section is for anyone who
+prefers the command line.
 
 Everything personal — your CV data, your applications, the day's leads — is gitignored.
 A fresh clone has the tools and none of the contents, so start by making your own.

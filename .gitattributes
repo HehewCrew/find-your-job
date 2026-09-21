@@ -1,0 +1,10 @@
+# Normalise text files in the repo; check out with the platform's line endings...
+* text=auto
+
+# ...except the launchers, which break with the wrong ones: bash reads a CRLF start.sh as
+# commands ending in '\r' ("command not found"), and cmd wants CRLF in start.bat.
+*.sh      text eol=lf
+*.command text eol=lf
+*.bat     text eol=crlf
+
+*.woff2 binary
