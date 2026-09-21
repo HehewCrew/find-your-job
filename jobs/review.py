@@ -36,6 +36,7 @@ TAKE, SKIP, PENDING = "take", "skip", "pending"
 # "## [x] 3. Company — Role". The marker is the only part meant to be hand-edited.
 _HEADING = re.compile(r"^##\s*\[(?P<mark>[^\]]?)\]\s*(?P<index>\d+)\.\s*(?P<label>.+)$")
 _LINK = re.compile(r"^- \*\*Link:\*\*\s*(.+)$")
+_DATE = re.compile(r"^# Today's scrape — (\d{4}-\d{2}-\d{2})")
 
 _MARKS = {"x": TAKE, "X": TAKE, "-": SKIP, "": PENDING, " ": PENDING}
 
@@ -195,3 +196,43 @@ def select(leads: list[Lead], selectors: list[str]) -> list[Lead]:
             if lead not in chosen:
                 chosen.append(lead)
     return chosen
+
+
+_MARK_CHAR = {TAKE: "x", SKIP: "-", PENDING: " "}
+
+
+def sheet_date(sheet: Path = SHEET_PATH) -> str | None:
+    """The day a sheet was scraped, from its header - None if there is no sheet."""
+    if not sheet.exists():
+        return None
+    for line in sheet.read_text(encoding="utf-8").splitlines()[:3]:
+        found = _DATE.match(line)
+        if found:
+            return found.group(1)
+    return None
+
+
+def set_mark(url: str, mark: str, *, sheet: Path = SHEET_PATH) -> None:
+    """Rewrite one lead's `[x]`/`[-]`/`[ ]`, found by its link - the UI's tick.
+
+    By URL, like read_sheet, so a sheet re-scraped or edited by hand since the page loaded
+    can never have the mark land on a different posting.
+    """
+    from jobs.errors import JobsError
+    from jobtrack.models import ValidationError
+
+    if mark not in _MARK_CHAR:
+        raise ValidationError(f"unknown mark {mark!r}; use one of {', '.join(_MARK_CHAR)}")
+    lines = sheet.read_text(encoding="utf-8").splitlines() if sheet.exists() else []
+    heading = None
+    for i, line in enumerate(lines):
+        if _HEADING.match(line):
+            heading = i
+            continue
+        link = _LINK.match(line)
+        if link and heading is not None and link.group(1).strip() == url:
+            marker = f"## [{_MARK_CHAR[mark]}]"
+            lines[heading] = re.sub(r"^##\s*\[[^\]]?\]", marker, lines[heading])
+            sheet.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            return
+    raise JobsError("The sheet changed since the page loaded - refresh to see today's leads.")

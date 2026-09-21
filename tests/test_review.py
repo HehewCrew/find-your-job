@@ -169,3 +169,36 @@ def test_select_all(sheet):
 def test_printed_numbers_are_contiguous_from_one(sheet):
     write(sheet, [scored(url=f"https://x/{i}") for i in range(1, 6)])
     assert [x.index for x in read(sheet)] == [1, 2, 3, 4, 5]
+
+
+# --- marking from the UI ----------------------------------------------------------
+
+
+def test_set_mark_round_trips_through_read_sheet(sheet):
+    write(sheet, [scored(url="https://x/1"), scored(company="Riot", url="https://x/2")])
+    md, _ = sheet
+    review.set_mark("https://x/2", review.TAKE, sheet=md)
+    review.set_mark("https://x/1", review.SKIP, sheet=md)
+    assert [lead.mark for lead in read(sheet)] == [review.SKIP, review.TAKE]
+    review.set_mark("https://x/1", review.PENDING, sheet=md)
+    assert read(sheet)[0].mark == review.PENDING
+
+
+def test_set_mark_on_a_url_no_longer_on_the_sheet_refuses(sheet):
+    from jobs.errors import JobsError
+
+    write(sheet, [scored(url="https://x/1")])
+    with pytest.raises(JobsError, match="changed"):
+        review.set_mark("https://x/9", review.TAKE, sheet=sheet[0])
+
+
+def test_set_mark_rejects_an_unknown_mark(sheet):
+    write(sheet, [scored(url="https://x/1")])
+    with pytest.raises(ValidationError):
+        review.set_mark("https://x/1", "maybe", sheet=sheet[0])
+
+
+def test_sheet_date_reads_the_header(sheet):
+    write(sheet, [scored()])
+    assert review.sheet_date(sheet[0]) == "2026-08-04"
+    assert review.sheet_date(sheet[0].with_name("missing.md")) is None

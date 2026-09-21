@@ -59,6 +59,13 @@ jobs/
   brief.py     Mark BRIEFS.md applied/aborted, then file it into applied/
   progress.py  Progress events for long jobs (scrape, pick, paste)
   errors.py    JobsError / Skipped - raised by run functions, mapped to exit 1 by main
+  ui/          `python -m jobs.ui`: local web page for the daily loop (stdlib http.server)
+    server.py  HTTP only: routes, token + Host checks, static files, SSE progress
+    api.py     One function per endpoint over the run functions; no HTTP
+    tasks.py   One long job at a time on a worker thread; progress as events
+    phase.py   The /jobhunt phase table as a pure function
+    paths.py   Every file the UI touches, so tests can point it at tmp_path
+    static/    index.html, app.css, app.js, bundled Atkinson Hyperlegible (OFL)
   targets.json Greenhouse/Lever/Ashby company boards to poll
   priorities.md  Apply / don't-apply criteria, read in triage  (gitignored; .example tracked)
 TODAY_SCRAPING.md    Today's leads, awaiting [x]/[-]  (regenerated each scrape)
@@ -172,3 +179,12 @@ repo. Don't answer it by describing the state; run the skill.
   it to hold the 2-page rule. Some variants have no room for it *at all* — `fit` dropping to
   zero keywords is expected, not a bug. Anything that stops short of an empty list will
   never converge on those.
+- **The UI server's two checks are the security model** - every POST carries the token
+  injected into `index.html`, and every request's `Host` must be `127.0.0.1:<port>` or
+  `localhost:<port>`. Don't add CORS headers or a token-free POST route; any web page the user
+  opens can reach 127.0.0.1. `/api/open` only opens files under `cv/out/` and `applications/`.
+- `jobs/ui/server.py` turns `SO_REUSEADDR` off on Windows on purpose: there it lets a second
+  server bind a busy port, and `python -m jobs.ui` relies on the bind failing to move on.
+- `Paths.tailored` must be where `tailor.TAILORED_DIR` builds. The CV modules use their own
+  module-level folders; `Paths` only redirects the sheet, briefs and store, which is why UI
+  tests combine `Paths.under(tmp_path)` with `cv_sandbox`.

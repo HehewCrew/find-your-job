@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="fyj-token" content="{{TOKEN}}">
+<title>Find Your Job</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="brand">Find Your Job</span>
+    <nav class="nav" aria-label="Main">
+      <button type="button" data-tab="today" aria-current="page">Today</button>
+      <button type="button" data-tab="paste">Paste a job</button>
+      <button type="button" data-tab="apps">Applications</button>
+    </nav>
+    <span class="engine" id="engine" title="Which program turns CVs into PDFs"><span class="dot"></span><span id="engine-text">Checking…</span></span>
+  </header>
+
+  <div id="banner" class="note" hidden></div>
+
+  <section id="tab-today">
+    <div class="steps" role="tablist" aria-label="Today's steps" id="steps"></div>
+    <div class="progress" id="progress" aria-live="polite"></div>
+    <div id="view"><p class="muted">Loading today…</p></div>
+  </section>
+
+  <section id="tab-paste" hidden>
+    <div class="panel">
+      <h2>Paste a job you found yourself</h2>
+      <p>For postings the daily scrape never sees: LinkedIn, a referral, a recruiter's email. You get a verdict before any CV is built.</p>
+      <form id="paste-form">
+        <div class="fields">
+          <label for="p-company">Company<input type="text" id="p-company" autocomplete="off"></label>
+          <label for="p-title">Role (optional, guessed from the text)<input type="text" id="p-title" autocomplete="off"></label>
+          <label for="p-url">Link (optional)<input type="text" id="p-url" autocomplete="off"></label>
+          <label for="p-location">Location (optional)<input type="text" id="p-location" autocomplete="off" placeholder="Remote, or a city"></label>
+        </div>
+        <label for="p-text">Job description<textarea id="p-text" placeholder="Paste the whole posting here."></textarea></label>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="p-assess">Get a verdict</button>
+        </div>
+        <p class="error" id="p-error" role="alert" hidden></p>
+      </form>
+      <div id="p-verdict" hidden></div>
+    </div>
+  </section>
+
+  <section id="tab-apps" hidden>
+    <div class="empty panel">
+      <h2>Every application, in one list</h2>
+      <p>Searching, filtering and updating your applications comes to this page in a later version. Until then, the command line has all of it:</p>
+      <pre>jobtrack list --open
+jobtrack show 12
+jobtrack update 12 --status interviewing</pre>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
