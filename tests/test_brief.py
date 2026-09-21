@@ -457,3 +457,63 @@ def test_write_briefs_stashes_a_sheet_that_was_never_closed(briefs_file):
     tailor.write_briefs([], briefs_file)
     assert briefs_file.with_name("BRIEFS.prev.md").read_text(encoding="utf-8") == SAMPLE
     assert brief.parse(briefs_file.read_text(encoding="utf-8")) == []
+
+
+def test_close_files_a_docx_when_no_pdf_was_made(briefs_file, tmp_path, tracked, monkeypatch):
+    tailored = tmp_path / "tailored"
+    docx = make_cv(tailored, "anthropic-red-team-engineer-safeguards", "Your_Name_CV.docx")
+    monkeypatch.setattr(brief, "TAILORED_DIR", tailored)
+
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    assert run(["close"], briefs_file, tmp_path, tracked.path) == 0
+
+    folder = tmp_path / brief.FOLDER / "anthropic-red-team-engineer-safeguards"
+    assert (folder / docx.name).exists()
+    assert not docx.exists(), "the tailored copy is swept once filed"
+    log = (tmp_path / brief.FOLDER / "LOG.md").read_text(encoding="utf-8")
+    assert "no tailored CV found" not in log
+    assert "`Your_Name_CV.docx`" in (folder / "questions.md").read_text(encoding="utf-8")
+
+
+def test_close_files_both_the_docx_and_the_pdf(briefs_file, tmp_path, tracked, monkeypatch):
+    tailored = tmp_path / "tailored"
+    slug = "anthropic-red-team-engineer-safeguards"
+    make_cv(tailored, slug, "Your_Name_CV.pdf")
+    make_cv(tailored, slug, "Your_Name_CV.docx")
+    monkeypatch.setattr(brief, "TAILORED_DIR", tailored)
+
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    run(["close"], briefs_file, tmp_path, tracked.path)
+
+    folder = tmp_path / brief.FOLDER / slug
+    assert sorted(p.name for p in folder.glob("Your_Name_CV.*")) == [
+        "Your_Name_CV.docx",
+        "Your_Name_CV.pdf",
+    ]
+    assert not (tailored / slug).exists(), "the emptied tailored folder is pruned"
+
+
+def test_a_docx_placed_by_hand_counts_as_the_cv(briefs_file, tmp_path, tracked):
+    folder = tmp_path / brief.FOLDER / "anthropic-red-team-engineer-safeguards"
+    folder.mkdir(parents=True)
+    (folder / "My_CV.docx").write_bytes(b"PK")
+
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    run(["close"], briefs_file, tmp_path, tracked.path)
+
+    log = (tmp_path / brief.FOLDER / "LOG.md").read_text(encoding="utf-8")
+    assert "no tailored CV found" not in log
+
+
+def test_a_word_lock_file_is_never_filed_as_a_cv(briefs_file, tmp_path, tracked, monkeypatch):
+    """Word leaves `~$<name>.docx` beside a document it has open."""
+    tailored = tmp_path / "tailored"
+    slug = "anthropic-red-team-engineer-safeguards"
+    make_cv(tailored, slug, "Your_Name_CV.docx")
+    make_cv(tailored, slug, "~$ur_Name_CV.docx")
+    monkeypatch.setattr(brief, "TAILORED_DIR", tailored)
+
+    assert [p.name for p in brief._cvs_for(slug, tailored)] == ["Your_Name_CV.docx"]

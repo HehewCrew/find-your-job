@@ -239,7 +239,7 @@ QUESTIONS_TEMPLATE = """# {label}
 - **Applied on:** {date}
 - **Posting:** {url}
 - **jobtrack id:** {app_id}
-- **CV attached:** `{cv}` (variant `{variant}`)
+- **CV attached:** {cv} (variant `{variant}`)
 - **Matched skills:** {matched}
 - **Gaps to expect:** {gaps}
 
@@ -255,14 +255,27 @@ below and keep the answer under it. If the form asked nothing, say so and delete
 """
 
 
-def _cv_for(slug: str, tailored: Path) -> Path | None:
-    """The generated CV for one posting: `cv/out/tailored/<slug>/<name>.pdf`.
+CV_SUFFIXES = (".pdf", ".docx")
 
-    Falls back to the old flat `*__<slug>.pdf`, so a CV built before the layout changed
-    is still found and filed rather than reported missing.
+
+def _cvs_for(slug: str, tailored: Path) -> list[Path]:
+    """Every generated CV file for one posting: `cv/out/tailored/<slug>/<name>.{pdf,docx}`.
+
+    The DOCX is always built and the PDF only when Word or LibreOffice is installed, so
+    either may be alone. Falls back to the old flat `*__<slug>.pdf`, so a CV built before
+    the layout changed is still found and filed rather than reported missing.
     """
-    matches = sorted((tailored / slug).glob("*.pdf")) or sorted(tailored.glob(f"*__{slug}.pdf"))
-    return matches[0] if matches else None
+    found = _cvs_in(tailored / slug)
+    if found:
+        return found
+    return sorted(p for s in CV_SUFFIXES for p in tailored.glob(f"*__{slug}{s}"))
+
+
+def _cvs_in(folder: Path) -> list[Path]:
+    # `~$name.docx` is the lock file Word keeps beside a document it has open.
+    return sorted(
+        p for p in folder.glob("*") if p.suffix in CV_SUFFIXES and not p.name.startswith("~$")
+    )
 
 
 def find_app(store: Store, b: Brief) -> Application | None:
@@ -283,7 +296,7 @@ class Filed:
     brief: Brief
     app_id: int
     folder: Path | None = None
-    cv: Path | None = None
+    cvs: list[Path] = field(default_factory=list)
     jd: Path | None = None
     kept_answers: bool = False
     problems: list[str] = field(default_factory=list)
@@ -318,20 +331,23 @@ def file_brief(b: Brief, store: Store, root: Path, *, dry_run: bool = False) -> 
     # The normal case for a form with questions: the answers were drafted here before
     # submitting. Never overwrite them, and don't report it as though something broke.
     filed.kept_answers = questions.exists()
-    source_cv = _cv_for(b.folder, TAILORED_DIR)
-    if source_cv is None and not any(dest.glob("*.pdf")):
+    sources = _cvs_for(b.folder, TAILORED_DIR)
+    if not sources and not _cvs_in(dest):
         filed.problems.append(f"no tailored CV found in cv/out/tailored/{b.folder}/")
     if dry_run:
         return filed
 
     dest.mkdir(parents=True, exist_ok=True)
-    if source_cv is not None:
-        filed.cv = dest / source_cv.name
-        if not filed.cv.exists():
-            shutil.copy2(source_cv, filed.cv)
+    if sources:
+        for source in sources:
+            target = dest / source.name
+            if not target.exists():
+                shutil.copy2(source, target)
+            if target.exists():
+                filed.cvs.append(target)
     else:
         # A CV put here by hand counts; not every variant comes from the tailored build.
-        filed.cv = next(iter(sorted(dest.glob("*.pdf"))), None)
+        filed.cvs = _cvs_in(dest)
 
     source_jd = TAILORED_DIR / b.folder / "jd.md"
     dest_jd = dest / "jd.md"
@@ -346,7 +362,7 @@ def file_brief(b: Brief, store: Store, root: Path, *, dry_run: bool = False) -> 
                 date=when,
                 url=b.url or "—",
                 app_id=app.id,
-                cv=filed.cv.name if filed.cv else "not found",
+                cv=", ".join(f"`{p.name}`" for p in filed.cvs) or "not found",
                 variant=b.variant or "—",
                 matched=b.matched or "—",
                 gaps=b.gaps or "none flagged",
@@ -440,25 +456,26 @@ def sweep_tailored(filed: list[Filed], aborted: list[Brief]) -> list[Path]:
     only removed after its copy under applications/<slug>/ is confirmed on disk; that
     copy is the record of what was actually sent. Aborted briefs keep nothing.
 
-    Only the generated locations are touched: the posting's own `<slug>/` subfolder, or
-    the old flat `*__<slug>.pdf` name. A CV dropped into cv/out/tailored/ by hand sits at
-    the top level under some other name, matches neither, and is never deleted.
+    Only the generated locations are touched - the posting's own `<slug>/` subfolder, or
+    the old flat `*__<slug>.pdf` name - and both the PDF and the DOCX there. A CV dropped
+    into cv/out/tailored/ by hand sits at the top level under some other name, matches
+    neither, and is never deleted.
     """
     removed: list[Path] = []
     for f in filed:
-        source = _cv_for(f.brief.folder, TAILORED_DIR)
         source_jd = TAILORED_DIR / f.brief.folder / "jd.md"
         if f.jd is not None and f.jd.exists():
             source_jd.unlink(missing_ok=True)
-        if source is None or f.cv is None or f.cv == source or not f.cv.exists():
-            continue
-        source.unlink(missing_ok=True)
-        removed.append(source)
-        _prune(source.parent)
+        sent = {p.name for p in f.cvs if p.exists()}
+        for source in _cvs_for(f.brief.folder, TAILORED_DIR):
+            if source.name not in sent or f.folder / source.name == source:
+                continue
+            source.unlink(missing_ok=True)
+            removed.append(source)
+            _prune(source.parent)
     for b in aborted:
-        source = _cv_for(b.folder, TAILORED_DIR)
         (TAILORED_DIR / b.folder / "jd.md").unlink(missing_ok=True)
-        if source is not None:
+        for source in _cvs_for(b.folder, TAILORED_DIR):
             source.unlink(missing_ok=True)
             removed.append(source)
             _prune(source.parent)
