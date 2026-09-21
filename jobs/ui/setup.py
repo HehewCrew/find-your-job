@@ -53,7 +53,9 @@ def check_profile(profile: dict) -> list[str]:
     if not isinstance(variants, dict) or not variants:
         raise ValidationError("Add at least one CV variant.")
     warnings: list[str] = []
-    with tempfile.TemporaryDirectory() as tmp:
+    # ignore_cleanup_errors: on Windows a virus scanner can still hold a just-written .docx
+    # when the folder is removed; a leftover temp folder is harmless, a failed save is not.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         for key in variants:
             try:
                 tl.cvbuild.build_variant(profile, key, warnings=warnings, out_dir=Path(tmp))
