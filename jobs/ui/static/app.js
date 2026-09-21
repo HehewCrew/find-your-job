@@ -472,6 +472,7 @@ function showTab(name) {
   document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === name ? "page" : "false"));
   for (const t of ["today", "paste", "apps", "setup"]) $(`tab-${t}`).hidden = t !== name;
   if (name === "setup") openSetup();
+  if (name === "apps") openApps(true);
 }
 
 document.addEventListener("click", (ev) => {

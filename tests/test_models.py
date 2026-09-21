@@ -70,3 +70,40 @@ def test_from_dict_ignores_unknown_keys():
         {"id": 1, "company": "Acme", "role": "Engineer", "legacy_field": "junk"}
     )
     assert app.company == "Acme"
+
+
+# --- update() and quiet ----------------------------------------------------------------
+
+
+def test_update_changes_validated_fields_and_touches():
+    app = Application(id=1, company="Acme", role="Engineer", updated_at="2026-01-01T00:00:00")
+    changed = app.update(status="interview", company="  Globex ", salary="50k")
+    assert changed == ["status=interviewing", "company=Globex", "salary=50k"]
+    assert (app.status, app.company, app.salary) == ("interviewing", "Globex", "50k")
+    assert app.updated_at != "2026-01-01T00:00:00"
+
+
+def test_update_with_no_real_change_does_not_touch():
+    app = Application(id=1, company="Acme", role="Engineer", updated_at="2026-01-01T00:00:00")
+    assert app.update(company="Acme") == []
+    assert app.updated_at == "2026-01-01T00:00:00"
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"company": "  "}, {"role": ""}, {"status": "w"}, {"applied_on": "21/09/2026"}, {"id": 9}],
+)
+def test_update_refuses_bad_input_and_changes_nothing(fields):
+    app = Application(id=1, company="Acme", role="Engineer")
+    before = app.to_dict()
+    with pytest.raises(ValidationError):
+        app.update(**fields)
+    assert app.to_dict() == before
+
+
+def test_an_open_application_untouched_for_14_days_is_quiet():
+    app = Application(id=1, company="Acme", role="Engineer", updated_at="2026-09-01T10:00:00")
+    assert app.is_quiet(date(2026, 9, 15))
+    assert not app.is_quiet(date(2026, 9, 14))
+    app.status = "rejected"
+    assert not app.is_quiet(date(2026, 12, 1))

@@ -26,7 +26,15 @@ from jobs.ui import phase, setup
 from jobs.ui.opener import open_path
 from jobs.ui.paths import Paths
 from jobs.ui.tasks import TaskRunner
-from jobtrack.models import ValidationError
+from jobtrack import report
+from jobtrack.models import (
+    EDITABLE,
+    QUIET_DAYS,
+    STATUSES,
+    Application,
+    ValidationError,
+    normalize_status,
+)
 from jobtrack.storage import Store
 
 # Verdicts waiting for "Build the CV", by id. A handful is plenty for one person.
@@ -382,3 +390,171 @@ def start_preview(paths: Paths, runner: TaskRunner, variant: str) -> None:
         return setup.preview(paths, variant, report)
 
     runner.start("preview", job)
+
+
+# --- applications (the jobtrack store) -----------------------------------------------
+
+
+class Missing(LookupError):
+    """No application with that id - server.py answers 404."""
+
+
+QUICK = {
+    # action: (new status, the note it leaves)
+    "no_reply": ("rejected", "no reply by {day} - closed from the dashboard as quiet"),
+    "heard_back": ("screening", "heard back {day}"),
+}
+
+
+def _app_id(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f"{value!r} is not an application number.") from None
+
+
+def _app(store: Store, app_id) -> Application:
+    app = store.get(_app_id(app_id))
+    if app is None:
+        raise Missing(f"No application #{app_id} - it may have been deleted.")
+    return app
+
+
+def _full(app: Application) -> dict:
+    return {**app.to_dict(), "open": app.is_open, "quiet": app.is_quiet()}
+
+
+def _guard(runner: TaskRunner) -> None:
+    # pick.run saves the store from its worker thread; a save from here in between would
+    # be overwritten, or overwrite it.
+    if runner.running() == "build":
+        raise JobsError("A CV build is saving to your applications - try again when it finishes.")
+
+
+def _filtered(
+    store: Store, statuses=(), open_only: bool = False, quiet: bool = False, q: str = ""
+) -> list[Application]:
+    apps = store.search(q) if q and q.strip() else store.applications
+    if statuses:
+        wanted = {normalize_status(s) for s in statuses}
+        apps = [a for a in apps if a.status in wanted]
+    if open_only:
+        apps = [a for a in apps if a.is_open]
+    if quiet:
+        apps = [a for a in apps if a.is_quiet()]
+    return sorted(apps, key=lambda a: a.updated_at, reverse=True)
+
+
+def apps_list(
+    paths: Paths, statuses=(), open_only: bool = False, quiet: bool = False, q: str = ""
+) -> dict:
+    store = Store(paths.store).load()
+    everything = store.applications
+    rows = _filtered(store, statuses, open_only, quiet, q)
+    counts = {s: sum(1 for a in everything if a.status == s) for s in STATUSES}
+    decided = counts["offer"] + counts["rejected"]
+    open_count = sum(1 for a in everything if a.is_open)
+    return {
+        "apps": [
+            {
+                "id": a.id,
+                "company": a.company,
+                "role": a.role,
+                "status": a.status,
+                "applied_on": a.applied_on,
+                "updated": a.updated_at[:10],
+                "location": a.location,
+                "quiet": a.is_quiet(),
+            }
+            for a in rows
+        ],
+        "stats": {
+            "total": len(everything),
+            "open": open_count,
+            "closed": len(everything) - open_count,
+            "by_status": counts,
+            "quiet": sum(1 for a in everything if a.is_quiet()),
+            "offer_rate": round(100 * counts["offer"] / decided) if decided else None,
+            "decided": decided,
+            "shown": len(rows),
+        },
+        "statuses": list(STATUSES),
+        "quiet_days": QUIET_DAYS,
+    }
+
+
+def app_get(paths: Paths, app_id) -> dict:
+    return _full(_app(Store(paths.store).load(), app_id))
+
+
+def app_add(paths: Paths, runner: TaskRunner, fields: dict) -> dict:
+    _guard(runner)
+    fields = dict(fields or {})
+    note = str(fields.pop("note", "") or "").strip()
+    unknown = sorted(set(fields) - set(EDITABLE))
+    if unknown:
+        raise ValidationError(f"cannot set {', '.join(unknown)}")
+    store = Store(paths.store).load()
+    values = {k: str(v) for k, v in fields.items() if str(v).strip() or k in ("company", "role")}
+    app = Application(
+        id=store.next_id(),
+        company=values.pop("company", ""),
+        role=values.pop("role", ""),
+        notes=[note] if note else [],
+        **values,
+    )
+    store.add(app)
+    store.save()
+    return _full(app)
+
+
+def app_update(paths: Paths, runner: TaskRunner, app_id, fields: dict) -> dict:
+    _guard(runner)
+    store = Store(paths.store).load()
+    app = _app(store, app_id)
+    changed = app.update(**(fields or {}))
+    if changed:
+        store.save()
+    return {"app": _full(app), "changed": changed}
+
+
+def app_note(paths: Paths, runner: TaskRunner, app_id, text: str) -> dict:
+    _guard(runner)
+    text = str(text or "").strip()
+    if not text:
+        raise ValidationError("Write the note first.")
+    store = Store(paths.store).load()
+    app = _app(store, app_id)
+    app.notes.append(text)
+    app.touch()
+    store.save()
+    return _full(app)
+
+
+def app_delete(paths: Paths, runner: TaskRunner, app_id) -> dict:
+    _guard(runner)
+    store = Store(paths.store).load()
+    app = _app(store, app_id)
+    store.remove(app.id)
+    store.save()
+    return {"deleted": app.id}
+
+
+def app_quick(paths: Paths, runner: TaskRunner, app_id, action: str) -> dict:
+    _guard(runner)
+    if action not in QUICK:
+        raise ValidationError(f"Unknown action {action!r}; use one of {', '.join(QUICK)}.")
+    status, note = QUICK[action]
+    store = Store(paths.store).load()
+    app = _app(store, app_id)
+    app.update(status=status)
+    app.notes.append(note.format(day=date.today().isoformat()))
+    app.touch()
+    store.save()
+    return _full(app)
+
+
+def apps_csv(
+    paths: Paths, statuses=(), open_only: bool = False, quiet: bool = False, q: str = ""
+) -> str:
+    return report.to_csv(_filtered(Store(paths.store).load(), statuses, open_only, quiet, q))

@@ -15,11 +15,13 @@ What each endpoint does lives in api.py; this module only speaks HTTP.
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import sys
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -105,6 +107,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(200, fn())
         except NotFound:
             self._json(404, {"error": "Not found."})
+        except api.Missing as exc:
+            self._json(404, {"error": str(exc)})
         except (ValidationError, settings.SettingsError) as exc:
             self._json(400, {"error": str(exc)})
         except brief.StillPending as exc:
@@ -133,6 +137,14 @@ class _Handler(BaseHTTPRequestHandler):
         elif url.path.startswith("/api/setup/"):
             name = url.path.removeprefix("/api/setup/")
             self._dispatch(lambda: api.setup_load(a.paths, name))
+        elif url.path == "/api/applications.csv":
+            self._csv(parse_qs(url.query))
+        elif url.path == "/api/applications":
+            qs = parse_qs(url.query)
+            self._dispatch(lambda: api.apps_list(a.paths, **_app_filters(qs)))
+        elif url.path.startswith("/api/applications/"):
+            app_id = url.path.removeprefix("/api/applications/")
+            self._dispatch(lambda: api.app_get(a.paths, app_id))
         elif url.path == "/api/events":
             since = int(parse_qs(url.query).get("since", ["0"])[0] or 0)
             self._events(since)
@@ -153,6 +165,24 @@ class _Handler(BaseHTTPRequestHandler):
             return
         ctype = TYPES.get(target.suffix, "application/octet-stream")
         self._send(200, target.read_bytes(), ctype)
+
+    def _csv(self, qs: dict) -> None:
+        try:
+            text = api.apps_csv(self.app.paths, **_app_filters(qs))
+        except ValidationError as exc:
+            self._json(400, {"error": str(exc)})
+            return
+        body = text.encode("utf-8-sig")  # the BOM makes Excel read the accents right
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header(
+            "Content-Disposition",
+            f'attachment; filename="applications-{date.today().isoformat()}.csv"',
+        )
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _events(self, since: int) -> None:
         """Server-Sent Events for the current task, closed once it has finished."""
@@ -223,6 +253,18 @@ class _Handler(BaseHTTPRequestHandler):
                 return {"task": "preview"}
             if path.startswith("/api/setup/"):
                 return api.setup_save(a.paths, path.removeprefix("/api/setup/"), b)
+            if path == "/api/applications":
+                return api.app_add(a.paths, a.runner, b.get("fields") or {})
+            one = _APP_ROUTE.match(path)
+            if one:
+                app_id, action = one.group(1), one.group(2)
+                if action is None:
+                    return api.app_update(a.paths, a.runner, app_id, b.get("fields") or {})
+                if action == "note":
+                    return api.app_note(a.paths, a.runner, app_id, b.get("text", ""))
+                if action == "delete":
+                    return api.app_delete(a.paths, a.runner, app_id)
+                return api.app_quick(a.paths, a.runner, app_id, str(b.get("action", "")))
             if path == "/api/open":
                 api.open_file(
                     a.paths, str(b.get("path", "")), bool(b.get("reveal")), opener=a.opener
@@ -235,6 +277,19 @@ class _Handler(BaseHTTPRequestHandler):
 
 def _not_found():
     raise NotFound
+
+
+_APP_ROUTE = re.compile(r"^/api/applications/(\d+)(?:/(note|delete|quick))?$")
+
+
+def _app_filters(qs: dict) -> dict:
+    """?status=applied&status=offer&open=1&quiet=1&q=acme -> apps_list's arguments."""
+    return {
+        "statuses": [s for s in qs.get("status", []) if s],
+        "open_only": qs.get("open", ["0"])[0] == "1",
+        "quiet": qs.get("quiet", ["0"])[0] == "1",
+        "q": qs.get("q", [""])[0],
+    }
 
 
 def make_server(
