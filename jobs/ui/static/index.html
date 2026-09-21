@@ -7,6 +7,7 @@
 <title>Find Your Job</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js" defer></script>
+<script src="/static/setup.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -16,6 +17,7 @@
       <button type="button" data-tab="today" aria-current="page">Today</button>
       <button type="button" data-tab="paste">Paste a job</button>
       <button type="button" data-tab="apps">Applications</button>
+      <button type="button" data-tab="setup">Setup<span class="flag" id="setup-flag" hidden title="Something still needs setting up"></span></button>
     </nav>
     <span class="engine" id="engine" title="Which program turns CVs into PDFs"><span class="dot"></span><span id="engine-text">Checking…</span></span>
   </header>
@@ -47,6 +49,10 @@
       </form>
       <div id="p-verdict" hidden></div>
     </div>
+  </section>
+
+  <section id="tab-setup" hidden>
+    <div id="setup-view"><p class="muted">Loading…</p></div>
   </section>
 
   <section id="tab-apps" hidden>

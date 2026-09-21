@@ -130,6 +130,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, html.replace("{{TOKEN}}", a.token).encode(), TYPES[".html"])
         elif url.path.startswith("/static/"):
             self._static(url.path)
+        elif url.path.startswith("/api/setup/"):
+            name = url.path.removeprefix("/api/setup/")
+            self._dispatch(lambda: api.setup_load(a.paths, name))
         elif url.path == "/api/events":
             since = int(parse_qs(url.query).get("since", ["0"])[0] or 0)
             self._events(since)
@@ -139,6 +142,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "/api/leads": lambda: api.leads(a.paths),
                 "/api/cvs": lambda: api.cvs(a.paths),
                 "/api/briefs": lambda: api.briefs(a.paths),
+                "/api/setup": lambda: api.setup_status(a.paths),
             }
             self._dispatch(routes.get(url.path, _not_found))
 
@@ -212,6 +216,13 @@ class _Handler(BaseHTTPRequestHandler):
                 )
             if path == "/api/close":
                 return api.close(a.paths, bool(b.get("dry_run")), bool(b.get("force")))
+            if path == "/api/setup/profile/start":
+                return api.setup_start(a.paths, b.get("answers"))
+            if path == "/api/setup/preview":
+                api.start_preview(a.paths, a.runner, str(b.get("variant", "")))
+                return {"task": "preview"}
+            if path.startswith("/api/setup/"):
+                return api.setup_save(a.paths, path.removeprefix("/api/setup/"), b)
             if path == "/api/open":
                 api.open_file(
                     a.paths, str(b.get("path", "")), bool(b.get("reveal")), opener=a.opener

@@ -22,7 +22,7 @@ from pathlib import Path
 from jobs import brief, paste, pick, review, scrape, settings
 from jobs import tailor as tl
 from jobs.errors import JobsError, Skipped
-from jobs.ui import phase
+from jobs.ui import phase, setup
 from jobs.ui.opener import open_path
 from jobs.ui.paths import Paths
 from jobs.ui.tasks import TaskRunner
@@ -83,6 +83,7 @@ def state(paths: Paths, runner: TaskRunner, engine: str, today: str | None = Non
         "settings_error": settings_error,
         "pdf_engine": engine,
         "task": runner.running(),
+        "setup_missing": setup.missing(paths),
     }
 
 
@@ -341,3 +342,43 @@ def open_file(
     if not target.exists():
         raise ValidationError("That file is no longer there - refresh the page.")
     opener(target, reveal)
+
+
+# --- setup -------------------------------------------------------------------------
+
+
+def setup_status(paths: Paths) -> dict:
+    return setup.status(paths)
+
+
+def setup_load(paths: Paths, name: str) -> dict:
+    if name == "profile_start":
+        return {
+            "name": name,
+            "label": "Start your profile",
+            "data": setup.guided_template(),
+            "schema": setup.GUIDED_SCHEMA,
+            "context": {},
+            "from_example": False,
+        }
+    return setup.load(paths, name)
+
+
+def setup_save(paths: Paths, name: str, payload: dict) -> dict:
+    return setup.save(paths, name, payload)
+
+
+def setup_start(paths: Paths, answers: dict) -> dict:
+    if not isinstance(answers, dict):
+        raise ValidationError("The form sent no answers.")
+    return setup.start_profile(paths, answers)
+
+
+def start_preview(paths: Paths, runner: TaskRunner, variant: str) -> None:
+    if not paths.profile.exists():
+        raise JobsError("Save your profile first - the preview builds from the saved file.")
+
+    def job(report) -> dict:
+        return setup.preview(paths, variant, report)
+
+    runner.start("preview", job)

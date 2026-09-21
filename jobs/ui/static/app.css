@@ -212,3 +212,40 @@ input[type="text"] {
   .foot .keys { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+
+/* setup */
+.flag { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); margin-left: 6px; vertical-align: middle; }
+.form { max-width: 860px; display: grid; gap: 14px; }
+.form > .intro { max-width: 72ch; color: var(--ink-soft); margin: 0; }
+.field { display: grid; gap: 4px; }
+.field > span { font-size: 13px; color: var(--ink-soft); }
+.field textarea { min-height: 72px; margin-bottom: 0; }
+.field.check { grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
+.field.check > span { color: var(--ink); font-size: 14px; }
+.field select, .field input[type="number"] {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; max-width: 100%;
+}
+.choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.choices label { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink); }
+.group {
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--surface);
+  padding: 0; margin: 0;
+}
+.group > summary {
+  cursor: pointer; padding: 10px 14px; font-weight: 700; list-style-position: inside;
+}
+.group > .body { display: grid; gap: 12px; padding: 4px 14px 14px; }
+.group .group { background: var(--paper); }
+.help { font-size: 13px; color: var(--ink-soft); max-width: 72ch; margin: 0; white-space: pre-line; }
+.item-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.item-tools .btn, .add { font-size: 13px; padding: 4px 10px; }
+.errorbox {
+  border-left: 3px solid var(--bad); background: var(--surface); padding: 10px 14px;
+  color: var(--ink); border-radius: 4px; max-width: 90ch;
+}
+.errorbox b { color: var(--bad); }
+.savebar {
+  position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--rule);
+  padding-block: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}

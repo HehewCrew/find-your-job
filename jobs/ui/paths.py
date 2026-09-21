@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -17,6 +17,16 @@ class Paths:
     store: Path  # applications.json (the jobtrack store)
     tailored: Path  # cv/out/tailored/
     applications: Path  # applications/ (one folder per application sent)
+    # The four personal files and the tracked examples they start from.
+    profile: Path
+    profile_example: Path
+    settings: Path
+    settings_example: Path
+    priorities: Path
+    priorities_example: Path
+    rules: Path
+    rules_example: Path
+    preview: Path  # cv/out/preview/ - Setup's "Preview CV" builds
 
     @classmethod
     def under(cls, root: Path) -> Paths:
@@ -30,6 +40,15 @@ class Paths:
             store=root / "applications.json",
             tailored=tailored,
             applications=root / "applications",
+            profile=root / "cv" / "profile.json",
+            profile_example=root / "cv" / "profile.example.json",
+            settings=root / "jobs" / "settings.json",
+            settings_example=root / "jobs" / "settings.example.json",
+            priorities=root / "jobs" / "priorities.md",
+            priorities_example=root / "jobs" / "priorities.example.md",
+            rules=root / "cv" / "rules.md",
+            rules_example=root / "cv" / "rules.example.md",
+            preview=root / "cv" / "out" / "preview",
         )
 
     @classmethod
@@ -40,6 +59,4 @@ class Paths:
         return cls.under(ROOT).with_store(default_path())
 
     def with_store(self, store: Path) -> Paths:
-        return Paths(
-            self.root, self.sheet, self.data, self.briefs, store, self.tailored, self.applications
-        )
+        return replace(self, store=store)

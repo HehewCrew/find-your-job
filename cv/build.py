@@ -330,11 +330,16 @@ def render_entry(d: Docx, entry: dict, tag: str, links: dict, *, show_keywords=T
 
 
 def build_variant(
-    profile: dict, tag: str, tailor: dict | None = None, warnings: list[str] | None = None
+    profile: dict,
+    tag: str,
+    tailor: dict | None = None,
+    warnings: list[str] | None = None,
+    out_dir: Path | None = None,
 ) -> tuple[Path, str]:
     """Render one variant. `tailor` optionally targets it at a specific posting:
     {company, job_title, matched: [...], slug} - `matched` must only ever contain
-    skills you actually have, so tailoring stays honest."""
+    skills you actually have, so tailoring stays honest. `out_dir` replaces OUT_DIR, for a
+    preview or a validation build that must not land among the real CVs."""
     try:
         v = profile["variants"][tag]
     except KeyError:
@@ -462,9 +467,9 @@ def build_variant(
         # One subfolder per application, so every CV can carry the same name - the file
         # that gets attached to a form should read as a CV, not as a build artefact.
         # The posting is identified by the folder; `d.save` creates it.
-        out = OUT_DIR / "tailored" / tailor["slug"] / f"{v['filename']}.docx"
+        out = (out_dir or OUT_DIR) / "tailored" / tailor["slug"] / f"{v['filename']}.docx"
     else:
-        out = OUT_DIR / v["folder"] / f"{v['filename']}.docx"
+        out = (out_dir or OUT_DIR) / v["folder"] / f"{v['filename']}.docx"
     d.save(out, title=f"{contact['name']} — {v['headline']}", author=contact["name"])
     return out, v["headline"]
 

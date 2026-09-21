@@ -164,3 +164,82 @@ def test_every_asset_the_page_references_is_served(app):
     assert any(r.endswith(".woff2") for r in refs)
     for ref in refs:
         assert call(srv, "GET", ref)[0] == 200, ref
+
+
+# --- setup routes ------------------------------------------------------------------
+
+
+def copy_examples(root):
+    import shutil
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parent.parent
+    for rel in (
+        "jobs/settings.example.json",
+        "cv/profile.example.json",
+        "jobs/priorities.example.md",
+        "cv/rules.example.md",
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(repo / rel, root / rel)
+
+
+def test_state_lists_the_setup_files_still_missing(app):
+    srv, *_ = app
+    _, body = call(srv, "GET", "/api/state")
+    assert body["setup_missing"] == ["profile", "settings", "priorities", "rules"]
+
+
+def test_setup_status_and_load(app):
+    srv, _, _, root = app
+    copy_examples(root)
+    status, body = call(srv, "GET", "/api/setup")
+    assert status == 200 and body["missing"] == ["profile", "settings", "priorities", "rules"]
+    status, body = call(srv, "GET", "/api/setup/rules")
+    assert status == 200 and body["sections"] and body["from_example"] is True
+    status, body = call(srv, "GET", "/api/setup/profile_start")
+    assert status == 200 and "contact" in body["data"] and body["schema"]
+    assert call(srv, "GET", "/api/setup/passwords")[0] == 400
+
+
+def test_an_invalid_settings_save_is_400_with_the_loaders_message(app):
+    srv, _, _, root = app
+    copy_examples(root)
+    _, loaded = call(srv, "GET", "/api/setup/settings")
+    data = loaded["data"]
+    data["roles"][0]["max_level"] = "overlord"
+    status, body = call(srv, "POST", "/api/setup/settings", {"data": data})
+    assert status == 400 and "max_level" in body["error"]
+    assert not (root / "jobs" / "settings.json").exists()
+    data["roles"][0]["max_level"] = "senior"
+    assert call(srv, "POST", "/api/setup/settings", {"data": data})[0] == 200
+    assert (root / "jobs" / "settings.json").exists()
+
+
+def test_the_guided_start_once_then_409(app):
+    srv, _, _, root = app
+    copy_examples(root)
+    _, tpl = call(srv, "GET", "/api/setup/profile_start")
+    a = tpl["data"]
+    a["contact"].update({"name": "Sam Rivera", "email": "sam@example.com"})
+    a.update({"headline": "QA", "summary": "QA engineer.", "variant_key": "qa"})
+    a["skill_groups"]["core"] = {"title": "QA", "items": ["Test design"]}
+    a["roles"][0].update(
+        {
+            "id": "acme",
+            "title": "QA",
+            "org": "Acme",
+            "start": "01/2022",
+            "bullets": ["Owned the regression suite"],
+        }
+    )
+    a["education"] = []
+    status, body = call(srv, "POST", "/api/setup/profile/start", {"answers": a})
+    assert status == 200, body
+    assert call(srv, "POST", "/api/setup/profile/start", {"answers": a})[0] == 409
+
+
+def test_preview_without_a_profile_is_409(app):
+    srv, *_ = app
+    status, body = call(srv, "POST", "/api/setup/preview", {"variant": "qa"})
+    assert status == 409 and "profile" in body["error"]

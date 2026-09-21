@@ -17,6 +17,7 @@ let lastBuild = null;    // result of the last pick, for failed rows
 let lastScrape = null;
 let verdict = null;      // last paste verdict
 let following = null;    // EventSource of the running task
+let firstLoad = true;    // opens Setup instead of Today when nothing is set up yet
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -131,10 +132,15 @@ async function refresh() {
     banner.innerHTML = `<b>Your settings could not be read.</b> ${esc(S.settings_error)}`;
     banner.hidden = false;
   } else if (S.example_settings) {
-    banner.innerHTML = "<b>Leads are ranked for the example person.</b> Copy <code>jobs/settings.example.json</code> to <code>jobs/settings.json</code> and make it yours.";
+    banner.innerHTML = '<b>Leads are ranked for the example person.</b> Describe your own search in Setup. <button type="button" class="btn" data-tab="setup">Open Setup</button>';
     banner.hidden = false;
   } else {
     banner.hidden = true;
+  }
+  $("setup-flag").hidden = !S.setup_missing.length;
+  if (firstLoad) {
+    firstLoad = false;
+    if (S.setup_missing.includes("profile") || S.setup_missing.includes("settings")) showTab("setup");
   }
   if (S.task && !following) follow().catch(() => {}).finally(refresh);
   await render();
@@ -464,7 +470,8 @@ async function pasteBuild() {
 
 function showTab(name) {
   document.querySelectorAll(".nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === name ? "page" : "false"));
-  for (const t of ["today", "paste", "apps"]) $(`tab-${t}`).hidden = t !== name;
+  for (const t of ["today", "paste", "apps", "setup"]) $(`tab-${t}`).hidden = t !== name;
+  if (name === "setup") openSetup();
 }
 
 document.addEventListener("click", (ev) => {
