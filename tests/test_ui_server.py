@@ -243,3 +243,65 @@ def test_preview_without_a_profile_is_409(app):
     srv, *_ = app
     status, body = call(srv, "POST", "/api/setup/preview", {"variant": "qa"})
     assert status == 409 and "profile" in body["error"]
+
+
+# --- applications routes -----------------------------------------------------------
+
+
+def seed(root):
+    from jobtrack.models import Application
+    from jobtrack.storage import Store
+
+    store = Store(root / "applications.json").load()
+    store.add(Application(id=1, company="Acme", role="QA", updated_at="2026-08-01T09:00:00"))
+    store.add(Application(id=2, company="Globex", role="SDET", status="rejected"))
+    store.save()
+
+
+def test_applications_list_filters_and_404(app):
+    srv, _, _, root = app
+    seed(root)
+    _, body = call(srv, "GET", "/api/applications?open=1")
+    assert [r["id"] for r in body["apps"]] == [1] and body["stats"]["total"] == 2
+    _, body = call(srv, "GET", "/api/applications?status=rejected&q=glo")
+    assert [r["id"] for r in body["apps"]] == [2]
+    assert call(srv, "GET", "/api/applications/1")[1]["company"] == "Acme"
+    assert call(srv, "GET", "/api/applications/99")[0] == 404
+    assert call(srv, "GET", "/api/applications?status=w")[0] == 400
+
+
+def test_applications_writes(app):
+    srv, _, _, root = app
+    seed(root)
+    status, body = call(
+        srv, "POST", "/api/applications", {"fields": {"company": "Hooli", "role": "QA"}}
+    )
+    assert status == 200 and body["id"] == 3
+    assert call(srv, "POST", "/api/applications/3", {"fields": {"company": ""}})[0] == 400
+    assert call(srv, "POST", "/api/applications/3", {"fields": {"status": "offer"}})[1][
+        "changed"
+    ] == ["status=offer"]
+    assert call(srv, "POST", "/api/applications/3/note", {"text": "call Friday"})[1]["notes"] == [
+        "call Friday"
+    ]
+    assert (
+        call(srv, "POST", "/api/applications/1/quick", {"action": "no_reply"})[1]["status"]
+        == "rejected"
+    )
+    assert call(srv, "POST", "/api/applications/3/delete", {})[0] == 200
+    assert call(srv, "POST", "/api/applications/3/delete", {})[0] == 404
+
+
+def test_applications_csv_is_a_download(app):
+    srv, _, _, root = app
+    seed(root)
+    port = srv.server_address[1]
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", "/api/applications.csv?open=1", headers={"Host": f"127.0.0.1:{port}"})
+    resp = conn.getresponse()
+    body = resp.read().decode("utf-8-sig")
+    conn.close()
+    assert resp.status == 200
+    assert resp.getheader("Content-Type").startswith("text/csv")
+    assert resp.getheader("Content-Disposition").startswith('attachment; filename="applications-')
+    assert "Acme" in body and "Globex" not in body
