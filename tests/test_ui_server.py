@@ -52,7 +52,7 @@ def call(srv, method, path, body=None, *, token=TOKEN, host=None):
     raw = resp.read()
     conn.close()
     ctype = resp.getheader("Content-Type", "")
-    return resp.status, (json.loads(raw) if "json" in ctype else raw.decode())
+    return resp.status, (json.loads(raw) if "json" in ctype else raw.decode(errors="replace"))
 
 
 def test_the_page_carries_the_token(app):
@@ -150,3 +150,17 @@ def test_a_busy_port_is_not_shared(app):
     srv, *_ = app
     with pytest.raises(OSError):
         server.make_server(Paths.under(app[3]), srv.server_address[1], engine="none")
+
+
+def test_every_asset_the_page_references_is_served(app):
+    import re
+
+    srv, *_ = app
+    _, page = call(srv, "GET", "/")
+    _, css = call(srv, "GET", "/static/app.css")
+    refs = set(re.findall(r'(?:href|src)="(/static/[^"]+)"', page))
+    refs |= set(re.findall(r'url\("(/static/[^"]+)"\)', css))
+    assert {"/static/app.css", "/static/app.js"} <= refs
+    assert any(r.endswith(".woff2") for r in refs)
+    for ref in refs:
+        assert call(srv, "GET", ref)[0] == 200, ref
