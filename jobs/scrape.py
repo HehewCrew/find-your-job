@@ -242,10 +242,13 @@ def run(
     store: Store,
     include_tracked: bool = False,
     report: Report | None = None,
+    sheet: Path | None = None,
+    data: Path | None = None,
 ) -> ScrapeResult:
     """Fetch every source, rank against settings.json, write TODAY_SCRAPING.md.
 
     Raises settings.SettingsError for unreadable settings. Writes nothing to jobtrack.
+    `sheet`/`data` override where the review sheet goes (the UI's Paths); default: the repo.
     """
     cfg = settings.current()
     if cfg.is_example:
@@ -284,7 +287,8 @@ def run(
     )
     for s in leads:
         s.tailor = tl.tailor_for(s.posting, s.variant)
-    sheet = review.write_sheet(leads, today()) if leads else None
+    where = {k: v for k, v in (("sheet", sheet), ("data", data)) if v is not None}
+    sheet = review.write_sheet(leads, today(), **where) if leads else None
     if sheet:
         emit(report, "write", f"{len(leads)} lead(s) written", detail=True)
     return ScrapeResult(raw, problems, leads, sheet, len(ashby), len(pruned), cfg.is_example)
