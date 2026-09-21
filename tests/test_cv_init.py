@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _load(name: str, path: Path):
-    """cv/ is not a package and build.py is imported by cv/fr/ under its bare name,
+    """cv/ is not a package and build.py is imported by jobs/tailor.py under its bare name,
     so load both modules from their file paths rather than restructuring the tree."""
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
