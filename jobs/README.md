@@ -1,5 +1,8 @@
 # Daily job scrape
 
+> Prefer a page to the command line? `python -m jobs.ui` runs this whole loop in your
+> browser - see the [main README](../README.md#using-the-web-page).
+
 Fetches postings from public job APIs, filters them against **your** settings
 ([settings.json](#making-it-yours)), ranks what survives, and writes them to a review sheet
 to choose from.

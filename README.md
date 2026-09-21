@@ -54,6 +54,24 @@ write `jobs/settings.json` the scrape ranks leads for the made-up person in the 
 it says so on every run — and every `cv` a role there names must be a variant in your
 `profile.json`.
 
+## Using the web page
+
+Everything the daily loop does from the command line also runs from a page in your browser:
+
+```bash
+python -m jobs.ui
+```
+
+It opens `http://127.0.0.1:8765/` and walks through the day in five steps - **Scrape**,
+**Review** (tick leads with `x`, drop them with `-`, move with `j`/`k`), **Build** the CVs,
+**Apply**, and **Close** the day - opening on the step you are at. **Paste a job** takes a
+posting the scrape never saw. Each CV has **Open** and **Show in folder**, for attaching it to
+an application form.
+
+Only your own computer can reach the page; press Ctrl+C in its window to stop it. The page and
+the command line work on the same files, so you can switch between them in the middle of a
+day. `--port 9000` picks another port, `--no-browser` only prints the address.
+
 ## Tracking applications
 
 ```bash
