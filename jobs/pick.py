@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
                 note = "  (no PDF - Word unavailable, .docx only)"
             print(f"  · {t['company'][:26]:<26} {t['variant']:<18}{note}")
         tl.append_briefs(tailors, args.briefs)
-        print(f"\n  {len(tailors)} brief(s) appended to {args.briefs.relative_to(ROOT)}")
+        print(f"\n  {len(tailors)} brief(s) appended to {tl.display_path(args.briefs)}")
 
     if dropped:
         print(f"  {len(dropped)} lead(s) recorded as withdrawn - they won't be scraped again.")

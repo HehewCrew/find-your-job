@@ -1,0 +1,16 @@
+exit=0
+--- stdout
+Fetching sources… (25 Ashby boards, 0 pruned)
+  tip: `python -m jobs.discover` widens Ashby beyond targets.json
+  1 raw postings
+  1 source(s) unavailable: lever:gone: HTTPError
+  1 qualify after filtering (0 filtered out or already tracked)
+
+  #  SCORE  COMPANY                   ROLE                                            CV / SIGNALS
+------------------------------------------------------------------------------------------------------------------------------------
+  1    137  Roblox                    QA Automation Engineer                          qa_gaming · remote-anywhere, QA-title, gaming-mentioned
+------------------------------------------------------------------------------------------------------------------------------------
+
+1 lead(s) written to <tmp>/S.md
+Tick the ones you want, then:  python -m jobs.pick
+--- stderr

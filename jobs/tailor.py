@@ -24,8 +24,22 @@ from jobs import settings  # noqa: E402
 MAX_PAGES = cvbuild.MAX_PAGES
 TAILORED_DIR = ROOT / "cv" / "out" / "tailored"
 
+
 PROFILE_PATH = ROOT / "cv" / "profile.json"
 EXAMPLE_PROFILE_PATH = ROOT / "cv" / "profile.example.json"
+
+
+def display_path(path: Path) -> str:
+    """Repo-relative when it is inside the repo, absolute otherwise.
+
+    --briefs, --file and test sandboxes can point anywhere, and Path.relative_to raises
+    rather than falling back - which turned a successful build into a traceback after
+    the work was already done.
+    """
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _profile() -> dict:
@@ -113,13 +127,14 @@ def tailor_for(posting, variant: str, *, max_keywords: int = 14) -> dict:
 
 
 def write_jd(
-    company: str, title: str, text: str, slug: str, tailored: Path = TAILORED_DIR
+    company: str, title: str, text: str, slug: str, tailored: Path | None = None
 ) -> Path | None:
     """Save the full posting text next to its tailored CV, so it survives past the day it
     was pasted or scraped - TODAY_SCRAPING.json is overwritten by the next day's scrape,
     and jobs.paste never kept the raw text at all. `jobs.brief close` copies this on into
     applications/<slug>/ when the posting is actually applied to.
     """
+    tailored = tailored or TAILORED_DIR
     text = (text or "").strip()
     if not text:
         return None

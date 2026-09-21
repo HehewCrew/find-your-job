@@ -1,0 +1,4 @@
+exit=2
+--- stdout
+--- stderr
+error: only 11 characters of job description - paste the full posting so the keyword match means something.

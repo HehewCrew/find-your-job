@@ -294,3 +294,17 @@ def test_write_briefs_and_append_briefs_render_the_same_block(tmp_path):
     tl.write_briefs([_tailor()], a)
     tl.append_briefs([_tailor()], b)
     assert parse(a.read_text(encoding="utf-8"))[0] == parse(b.read_text(encoding="utf-8"))[0]
+
+
+def test_display_path_is_repo_relative_inside_the_repo():
+    assert tl.display_path(tl.ROOT / "cv" / "x.pdf").replace("\\", "/") == "cv/x.pdf"
+
+
+def test_display_path_falls_back_to_absolute_outside_the_repo(tmp_path):
+    assert tl.display_path(tmp_path / "x.pdf") == str(tmp_path / "x.pdf")
+
+
+def test_write_jd_follows_a_patched_tailored_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(tl, "TAILORED_DIR", tmp_path)
+    path = tl.write_jd("Acme", "QA", "the text", "acme-qa")
+    assert path == tmp_path / "acme-qa" / "jd.md"

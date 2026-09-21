@@ -1,0 +1,13 @@
+exit=0
+--- stdout
+  take  #1  Roblox — QA Analyst
+  drop  #2  Riot
+
+Tailoring 1 CV(s)…
+  · Roblox                     qa_gaming           (no PDF - Word unavailable, .docx only)
+
+  1 brief(s) appended to <tmp>/BRIEFS.md
+  1 lead(s) recorded as withdrawn - they won't be scraped again.
+
+Next: apply, then  python -m jobs.brief applied <n>
+--- stderr

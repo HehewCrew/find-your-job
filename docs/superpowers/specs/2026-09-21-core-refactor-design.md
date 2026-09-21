@@ -55,14 +55,14 @@ All results are dataclasses defined in the module that produces them.
 class CvResult:
     company: str
     variant: str
-    docx: Path | None          # always present on success
-    pdf: Path | None           # None when no engine produced one
-    engine: str | None         # "word" | "libreoffice" | None
-    pages: int | None          # None = not checked
+    docx: Path | None  # always present on success
+    pdf: Path | None  # None when no engine produced one
+    engine: str | None  # "word" | "libreoffice" | None
+    pages: int | None  # None = not checked
     keywords_wanted: int
     keywords_kept: int
-    warnings: list[str]        # what build.py used to print
-    error: str = ""            # set when this CV failed; the others still complete
+    warnings: list[str]  # what build.py used to print
+    error: str = ""  # set when this CV failed; the others still complete
 ```
 
 - `PickResult`: `taken`, `dropped` (leads), `cvs: list[CvResult]`, `briefs_path`.
@@ -84,11 +84,12 @@ New module `jobs/progress.py`, with no internal imports:
 ```python
 @dataclass(frozen=True)
 class Progress:
-    stage: str              # "fetch" | "rank" | "tailor" | "llm" | "write"
-    message: str            # readable sentence
+    stage: str  # "fetch" | "rank" | "tailor" | "llm" | "write"
+    message: str  # readable sentence
     done: int | None = None
     total: int | None = None
-    detail: bool = False    # per-item tick
+    detail: bool = False  # per-item tick
+
 
 Report = Callable[[Progress], None]
 ```

@@ -108,19 +108,6 @@ _ATS_HOSTS = {
 }
 
 
-def _show(path: Path) -> str:
-    """Repo-relative when it is inside the repo, absolute otherwise.
-
-    --briefs and --file can point anywhere, and Path.relative_to raises rather than
-    falling back - which turned a successful build into a traceback after the work
-    was already done.
-    """
-    try:
-        return str(path.relative_to(ROOT))
-    except ValueError:
-        return str(path)
-
-
 def company_from_url(url: str) -> str:
     """Best-effort employer name from a careers URL. Empty when it would be a guess."""
     match = re.match(r"https?://([^/]+)", url.strip())
@@ -389,7 +376,7 @@ def main(argv: list[str] | None = None) -> int:
     tl.append_briefs([t], args.briefs)
     tl.write_jd(company, title, text, t["slug"])
     for path in made:
-        print(f"\n  CV      -> {_show(path)}" + (f"  ({pages} pages)" if pages else ""))
+        print(f"\n  CV      -> {tl.display_path(path)}" + (f"  ({pages} pages)" if pages else ""))
     if pages > tl.MAX_PAGES:
         print(
             f"  !! still {pages} pages with no keyword block left to trim - "
@@ -398,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     if not made:
         print("  !  no PDF produced (Word unavailable); the .docx is in cv/out/tailored/")
-    print(f"  Brief   -> appended to {_show(args.briefs)}")
+    print(f"  Brief   -> appended to {tl.display_path(args.briefs)}")
 
     if args.save:
         store = Store(args.store_file or default_path())

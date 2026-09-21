@@ -249,8 +249,17 @@ def sheet(tmp_path):
 def run_pick(argv, sheet, tmp_path):
     md, js = sheet
     return pick.main(
-        [*argv, "--sheet", str(md), "--data", str(js), "--briefs", str(tmp_path / "BRIEFS.md"),
-         "--file", str(tmp_path / "applications.json")]
+        [
+            *argv,
+            "--sheet",
+            str(md),
+            "--data",
+            str(js),
+            "--briefs",
+            str(tmp_path / "BRIEFS.md"),
+            "--file",
+            str(tmp_path / "applications.json"),
+        ]
     )
 
 
@@ -274,8 +283,17 @@ def run_paste(argv, tmp_path):
     jd = tmp_path / "jd.txt"
     jd.write_text(JD, encoding="utf-8")
     return paste.main(
-        ["--file", str(jd), "--company", "Acme", "--variant", "qa_gaming",
-         "--briefs", str(tmp_path / "BRIEFS.md"), *argv]
+        [
+            "--file",
+            str(jd),
+            "--company",
+            "Acme",
+            "--variant",
+            "qa_gaming",
+            "--briefs",
+            str(tmp_path / "BRIEFS.md"),
+            *argv,
+        ]
     )
 
 
@@ -353,9 +371,7 @@ def test_scrape_writes_the_sheet(tmp_path, cv_sandbox, monkeypatch, capsys, gold
     monkeypatch.setattr(
         scrape.review,
         "write_sheet",
-        lambda leads, when: real(
-            leads, when, sheet=tmp_path / "S.md", data=tmp_path / "S.json"
-        ),
+        lambda leads, when: real(leads, when, sheet=tmp_path / "S.md", data=tmp_path / "S.json"),
     )
     code = scrape.main(["--file", str(tmp_path / "applications.json")])
     out, err = capsys.readouterr()
@@ -592,8 +608,9 @@ def fake_pdf(monkeypatch, pages_by_keywords, engine="word"):
     """to_pdf stand-in: page count depends on how many keywords the CV was built with."""
     calls: list[int] = []
 
-    def to_pdf(paths, *, keep_docx=False, pages_out=None, warn=True, warnings=None,
-               engines_out=None):
+    def to_pdf(
+        paths, *, keep_docx=False, pages_out=None, warn=True, warnings=None, engines_out=None
+    ):
         assert keep_docx, "tailored CVs must keep their .docx"
         made = []
         for src in paths:
@@ -1041,7 +1058,7 @@ In the `QUESTIONS_TEMPLATE`, change the CV line to:
 and in `file_brief`'s `.format(...)` call replace `cv=filed.cv.name if filed.cv else "not found",` with:
 
 ```python
-                cv=", ".join(f"`{p.name}`" for p in filed.cvs) or "not found",
+cv = (", ".join(f"`{p.name}`" for p in filed.cvs) or "not found",)
 ```
 
 Replace `sweep_tailored`'s loop bodies with:
@@ -1304,7 +1321,9 @@ def cmd_close(args: argparse.Namespace, briefs: list[Brief]) -> int:
     if result.dry_run:
         print("\n--dry-run: nothing written.")
         return 0
-    print(f"\nLogged {len(result.filed)} application(s) to {result.log_path.relative_to(args.root)}")
+    print(
+        f"\nLogged {len(result.filed)} application(s) to {result.log_path.relative_to(args.root)}"
+    )
     if result.swept:
         print(f"Cleared {len(result.swept)} tailored CV(s); the ones you sent are in {FOLDER}/.")
     print(f"{args.briefs.name} is empty and ready for tomorrow's scrape.")
@@ -1355,8 +1374,13 @@ LONG_JD = JD + "\nFully remote, worldwide. " * 3
 
 
 def test_build_writes_the_cv_brief_and_jd(tmp_path, cv_sandbox):
-    a = paste.assess(LONG_JD, company="Acme", title="Senior QA Automation Engineer",
-                     variant="qa_gaming", use_llm=False)
+    a = paste.assess(
+        LONG_JD,
+        company="Acme",
+        title="Senior QA Automation Engineer",
+        variant="qa_gaming",
+        use_llm=False,
+    )
     events = []
     result = paste.build(a, LONG_JD, force=True, briefs=tmp_path / "B.md", report=events.append)
     assert result.cv.docx.exists()
@@ -1368,8 +1392,13 @@ def test_build_writes_the_cv_brief_and_jd(tmp_path, cv_sandbox):
 
 
 def test_build_refuses_a_skip_unless_forced(tmp_path, cv_sandbox):
-    a = paste.assess(LONG_JD, company="Acme", title="Senior QA Automation Engineer",
-                     variant="qa_gaming", use_llm=False)
+    a = paste.assess(
+        LONG_JD,
+        company="Acme",
+        title="Senior QA Automation Engineer",
+        variant="qa_gaming",
+        use_llm=False,
+    )
     a.rules = paste.llm.Verdict("skip", blockers=["US only"])
     with pytest.raises(Skipped) as caught:
         paste.build(a, LONG_JD, briefs=tmp_path / "B.md")
@@ -1379,8 +1408,9 @@ def test_build_refuses_a_skip_unless_forced(tmp_path, cv_sandbox):
 
 
 def test_build_can_save_to_jobtrack(tmp_path, cv_sandbox):
-    a = paste.assess(LONG_JD, company="Acme", title="QA Engineer", variant="qa_gaming",
-                     use_llm=False)
+    a = paste.assess(
+        LONG_JD, company="Acme", title="QA Engineer", variant="qa_gaming", use_llm=False
+    )
     store = Store(tmp_path / "applications.json").load()
     result = paste.build(a, LONG_JD, force=True, save=True, store=store, briefs=tmp_path / "B.md")
     saved = Store(tmp_path / "applications.json").load().get(result.app_id)
@@ -1586,8 +1616,11 @@ def make_lead(i: int, company: str, mark: str) -> review.Lead:
 
 
 def test_choose_takes_ticked_and_drops_skipped():
-    leads = [make_lead(1, "A", review.TAKE), make_lead(2, "B", review.SKIP),
-             make_lead(3, "C", review.PENDING)]
+    leads = [
+        make_lead(1, "A", review.TAKE),
+        make_lead(2, "B", review.SKIP),
+        make_lead(3, "C", review.PENDING),
+    ]
     taken, dropped = pick.choose(leads, [], "S.md")
     assert [x.company for x in taken] == ["A"] and [x.company for x in dropped] == ["B"]
 
@@ -1601,8 +1634,11 @@ def test_run_builds_records_and_reports(tmp_path, cv_sandbox):
     store = Store(tmp_path / "applications.json").load()
     events = []
     result = pick.run(
-        [make_lead(1, "A", review.TAKE)], [make_lead(2, "B", review.SKIP)],
-        briefs=tmp_path / "B.md", store=store, report=events.append,
+        [make_lead(1, "A", review.TAKE)],
+        [make_lead(2, "B", review.SKIP)],
+        briefs=tmp_path / "B.md",
+        store=store,
+        report=events.append,
     )
     assert [cv.error for cv in result.cvs] == [""]
     assert result.cvs[0].docx.exists()
@@ -1624,9 +1660,14 @@ def test_one_failing_cv_does_not_lose_the_others_briefs(tmp_path, cv_sandbox, mo
     monkeypatch.setattr(pick.tl, "fit", flaky)
     store = Store(tmp_path / "applications.json").load()
     result = pick.run(
-        [make_lead(1, "A", review.TAKE), make_lead(2, "B", review.TAKE),
-         make_lead(3, "C", review.TAKE)],
-        [], briefs=tmp_path / "B.md", store=store,
+        [
+            make_lead(1, "A", review.TAKE),
+            make_lead(2, "B", review.TAKE),
+            make_lead(3, "C", review.TAKE),
+        ],
+        [],
+        briefs=tmp_path / "B.md",
+        store=store,
     )
     assert [cv.error for cv in result.cvs] == ["", "Word crashed", ""]
     text = (tmp_path / "B.md").read_text(encoding="utf-8")
@@ -1747,8 +1788,14 @@ def run(
     if tailors:
         emit(report, "tailor", f"\nTailoring {len(tailors)} CV(s)…")
     for i, t in enumerate(tailors, 1):
-        emit(report, "tailor", f"Tailoring {i}/{len(tailors)}: {t['company']}",
-             done=i - 1, total=len(tailors), detail=True)
+        emit(
+            report,
+            "tailor",
+            f"Tailoring {i}/{len(tailors)}: {t['company']}",
+            done=i - 1,
+            total=len(tailors),
+            detail=True,
+        )
         try:
             cv = tl.fit(t, report=report)
             built.append(t)
@@ -1765,31 +1812,34 @@ def run(
 Replace `main` from `chosen = (` to the final `return 0` with:
 
 ```python
-    try:
-        taken, dropped = choose(leads, args.selectors, args.sheet.name)
-    except JobsError as exc:
-        print(exc, file=sys.stderr)
-        return 1
+try:
+    taken, dropped = choose(leads, args.selectors, args.sheet.name)
+except JobsError as exc:
+    print(exc, file=sys.stderr)
+    return 1
 
-    for lead in taken:
-        print(f"  take  #{lead.index}  {lead.company} — {lead.title or lead.label}")
-    for lead in dropped:
-        print(f"  drop  #{lead.index}  {lead.company}")
-    if args.dry_run:
-        print(f"\n--dry-run: would build {len(taken)} CV(s), nothing written.")
-        return 0
+for lead in taken:
+    print(f"  take  #{lead.index}  {lead.company} — {lead.title or lead.label}")
+for lead in dropped:
+    print(f"  drop  #{lead.index}  {lead.company}")
+if args.dry_run:
+    print(f"\n--dry-run: would build {len(taken)} CV(s), nothing written.")
+    return 0
 
-    result = run(
-        taken, dropped, briefs=args.briefs, store=Store(args.file or default_path()),
-        report=printer(),
-    )
-    built = [cv for cv in result.cvs if not cv.error]
-    if built:
-        print(f"\n  {len(built)} brief(s) appended to {tl.display_path(args.briefs)}")
-    if dropped:
-        print(f"  {len(dropped)} lead(s) recorded as withdrawn - they won't be scraped again.")
-    print("\nNext: apply, then  python -m jobs.brief applied <n>")
-    return 1 if len(built) < len(result.cvs) else 0
+result = run(
+    taken,
+    dropped,
+    briefs=args.briefs,
+    store=Store(args.file or default_path()),
+    report=printer(),
+)
+built = [cv for cv in result.cvs if not cv.error]
+if built:
+    print(f"\n  {len(built)} brief(s) appended to {tl.display_path(args.briefs)}")
+if dropped:
+    print(f"  {len(dropped)} lead(s) recorded as withdrawn - they won't be scraped again.")
+print("\nNext: apply, then  python -m jobs.brief applied <n>")
+return 1 if len(built) < len(result.cvs) else 0
 ```
 
 Delete `pick.py`'s now-unused `ROOT` only if ruff reports it unused.
@@ -1905,7 +1955,9 @@ def test_run_ranks_writes_the_sheet_and_reports(tmp_path, monkeypatch, cv_sandbo
     monkeypatch.setattr(scrape, "collect", lambda *a, **k: ([posting(1), posting(2)], []))
     events = []
     result = scrape.run(
-        sources=None, min_score=None, store=Store(tmp_path / "a.json").load(),
+        sources=None,
+        min_score=None,
+        store=Store(tmp_path / "a.json").load(),
         report=events.append,
     )
     assert result.raw == 2 and len(result.leads) == 2
@@ -1936,18 +1988,24 @@ In `jobs/scrape.py` add imports: `from dataclasses import dataclass` (stdlib blo
 `as_completed` loop with:
 
 ```python
-        for done, fut in enumerate(cf.as_completed(futures), 1):
-            name = futures[fut]
-            try:
-                got = fut.result()
-                out.extend(got)
-                mark = f"✓ {len(got)}"
-            except Exception as exc:  # noqa: BLE001
-                problems.append(f"{name}: {type(exc).__name__}")
-                mark = "✗"
-            # Emitted here, in the calling thread, never from a worker - see jobs.progress.
-            emit(report, "fetch", f"{done}/{len(futures)} {name} {mark}",
-                 done=done, total=len(futures), detail=True)
+for done, fut in enumerate(cf.as_completed(futures), 1):
+    name = futures[fut]
+    try:
+        got = fut.result()
+        out.extend(got)
+        mark = f"✓ {len(got)}"
+    except Exception as exc:  # noqa: BLE001
+        problems.append(f"{name}: {type(exc).__name__}")
+        mark = "✗"
+    # Emitted here, in the calling thread, never from a worker - see jobs.progress.
+    emit(
+        report,
+        "fetch",
+        f"{done}/{len(futures)} {name} {mark}",
+        done=done,
+        total=len(futures),
+        detail=True,
+    )
 ```
 
 Add before `main`:

@@ -182,7 +182,7 @@ def make_cvs(leads: list[Scored]) -> None:
             "kept in cv/out/tailored/BRIEFS.prev.md"
         )
     print(f"  {len(made)} tailored CV(s) in cv/out/tailored/")
-    print(f"  briefing sheet: {sheet.relative_to(HERE.parent)}")
+    print(f"  briefing sheet: {tl.display_path(sheet)}")
     for t in tailors[:5]:
         gaps = ", ".join(t["gaps"][:4]) or "none"
         print(f"    · {t['company'][:28]:<28} matched {len(t['matched']):>2} | gaps: {gaps}")
@@ -266,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         s.tailor = tl.tailor_for(s.posting, s.variant)
     if leads:
         sheet = review.write_sheet(leads, today())
-        print(f"\n{len(leads)} lead(s) written to {sheet.relative_to(HERE.parent)}")
+        print(f"\n{len(leads)} lead(s) written to {tl.display_path(sheet)}")
         print("Tick the ones you want, then:  python -m jobs.pick")
 
     # --save/--cv keep the original one-shot behaviour for anyone who wants it, and are
