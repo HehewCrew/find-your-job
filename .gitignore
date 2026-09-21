@@ -52,6 +52,12 @@ cv/rules.md
 # What the scrape ranks for - home country, work authorization, target roles. Personal for
 # the same reason; settings.example.json beside it is tracked.
 jobs/settings.json
+# The previous version of each, kept by the web page's Setup on every save. Same data, same
+# reason to stay out of git.
+cv/profile.json.bak
+jobs/settings.json.bak
+jobs/priorities.md.bak
+cv/rules.md.bak
 
 # Editors / OS
 .vscode/
