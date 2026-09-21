@@ -1,0 +1,14 @@
+exit=0
+--- stdout
+
+  Company : Acme
+  Role    : Senior QA Automation Engineer
+  CV      : qa_gaming  (forced)
+  Matched : Python, Jira, REST APIs, API testing, Test automation, Test design, Regression testing, Defect management, Quality assurance
+  Gaps    : none flagged
+
+  Rules: APPLY
+    why     scores 117: remote+overlap, QA-title, gaming-mentioned
+
+--dry-run: no CV built, nothing appended.
+--- stderr

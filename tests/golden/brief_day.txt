@@ -1,0 +1,23 @@
+exit=2
+--- stdout
+applied: Roblox — QA Analyst
+1 still pending.
+aborted: Riot — QA Lead (US-only)
+All marked. Next: python -m jobs.brief close
+  #  STATUS    COMPANY  ROLE
+---------------------------------------------------------------
+  1  applied   Roblox  QA Analyst
+  2  aborted   Riot    QA Lead  (US-only)
+---------------------------------------------------------------
+2 brief(s): 1 applied, 1 aborted
+
+All marked. File them with:  python -m jobs.brief close
+applications/roblox-qa/  <- jobtrack #1, CV qa_gaming
+not pursued: Riot — QA Lead (jobtrack #2 -> withdrawn)
+
+Logged 1 application(s) to applications/LOG.md
+Cleared 1 tailored CV(s); the ones you sent are in applications/.
+BRIEFS.md is empty and ready for tomorrow's scrape.
+--- stderr
+  unmarked: Riot — QA Lead
+1 brief(s) still pending. Mark them, or pass --force to close anyway (pending briefs are discarded).

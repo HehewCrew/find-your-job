@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from jobs import brief
+from jobs.errors import JobsError
 
 from jobtrack.models import Application, ValidationError
 from jobtrack.storage import Store
@@ -457,3 +458,112 @@ def test_write_briefs_stashes_a_sheet_that_was_never_closed(briefs_file):
     tailor.write_briefs([], briefs_file)
     assert briefs_file.with_name("BRIEFS.prev.md").read_text(encoding="utf-8") == SAMPLE
     assert brief.parse(briefs_file.read_text(encoding="utf-8")) == []
+
+
+def test_close_files_a_docx_when_no_pdf_was_made(briefs_file, tmp_path, tracked, monkeypatch):
+    tailored = tmp_path / "tailored"
+    docx = make_cv(tailored, "anthropic-red-team-engineer-safeguards", "Your_Name_CV.docx")
+    monkeypatch.setattr(brief, "TAILORED_DIR", tailored)
+
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    assert run(["close"], briefs_file, tmp_path, tracked.path) == 0
+
+    folder = tmp_path / brief.FOLDER / "anthropic-red-team-engineer-safeguards"
+    assert (folder / docx.name).exists()
+    assert not docx.exists(), "the tailored copy is swept once filed"
+    log = (tmp_path / brief.FOLDER / "LOG.md").read_text(encoding="utf-8")
+    assert "no tailored CV found" not in log
+    assert "`Your_Name_CV.docx`" in (folder / "questions.md").read_text(encoding="utf-8")
+
+
+def test_close_files_both_the_docx_and_the_pdf(briefs_file, tmp_path, tracked, monkeypatch):
+    tailored = tmp_path / "tailored"
+    slug = "anthropic-red-team-engineer-safeguards"
+    make_cv(tailored, slug, "Your_Name_CV.pdf")
+    make_cv(tailored, slug, "Your_Name_CV.docx")
+    monkeypatch.setattr(brief, "TAILORED_DIR", tailored)
+
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    run(["close"], briefs_file, tmp_path, tracked.path)
+
+    folder = tmp_path / brief.FOLDER / slug
+    assert sorted(p.name for p in folder.glob("Your_Name_CV.*")) == [
+        "Your_Name_CV.docx",
+        "Your_Name_CV.pdf",
+    ]
+    assert not (tailored / slug).exists(), "the emptied tailored folder is pruned"
+
+
+def test_a_docx_placed_by_hand_counts_as_the_cv(briefs_file, tmp_path, tracked):
+    folder = tmp_path / brief.FOLDER / "anthropic-red-team-engineer-safeguards"
+    folder.mkdir(parents=True)
+    (folder / "My_CV.docx").write_bytes(b"PK")
+
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    run(["close"], briefs_file, tmp_path, tracked.path)
+
+    log = (tmp_path / brief.FOLDER / "LOG.md").read_text(encoding="utf-8")
+    assert "no tailored CV found" not in log
+
+
+def test_a_word_lock_file_is_never_filed_as_a_cv(briefs_file, tmp_path, tracked, monkeypatch):
+    """Word leaves `~$<name>.docx` beside a document it has open."""
+    tailored = tmp_path / "tailored"
+    slug = "anthropic-red-team-engineer-safeguards"
+    make_cv(tailored, slug, "Your_Name_CV.docx")
+    make_cv(tailored, slug, "~$ur_Name_CV.docx")
+    monkeypatch.setattr(brief, "TAILORED_DIR", tailored)
+
+    assert [p.name for p in brief._cvs_for(slug, tailored)] == ["Your_Name_CV.docx"]
+
+
+def test_mark_briefs_returns_what_changed(briefs_file):
+    result = brief.mark_briefs(briefs_file, ["1"], brief.APPLIED)
+    assert [b.company for b in result.changed] == ["Anthropic"]
+    assert result.pending == 1
+    assert brief.load(briefs_file)[1][0].state == brief.APPLIED
+
+
+def test_mark_briefs_on_an_empty_file_is_nothing_to_do(tmp_path):
+    with pytest.raises(JobsError):
+        brief.mark_briefs(tmp_path / "missing.md", ["1"], brief.APPLIED)
+
+
+def test_close_raises_still_pending_with_the_unmarked(briefs_file, tmp_path, tracked):
+    brief.mark_briefs(briefs_file, ["1"], brief.APPLIED)
+    with pytest.raises(brief.StillPending) as caught:
+        brief.close(briefs_file, tmp_path, tracked)
+    assert [b.company for b in caught.value.briefs] == ["prolific"]
+
+
+def test_close_with_nothing_marked_is_nothing_to_do(briefs_file, tmp_path, tracked):
+    with pytest.raises(JobsError):
+        brief.close(briefs_file, tmp_path, tracked)
+
+
+def test_close_returns_what_it_filed(briefs_file, tmp_path, tracked, isolated_tailored):
+    make_cv(isolated_tailored, "anthropic-red-team-engineer-safeguards")
+    brief.mark_briefs(briefs_file, ["1"], brief.APPLIED)
+    brief.mark_briefs(briefs_file, ["2"], brief.ABORTED)
+
+    result = brief.close(briefs_file, tmp_path, tracked)
+
+    assert [f.app_id for f in result.filed] == [1]
+    assert [(b.company, app_id) for b, app_id in result.dropped] == [("prolific", 2)]
+    assert len(result.swept) == 1
+    assert result.log_path == tmp_path / brief.FOLDER / "LOG.md"
+    assert result.dry_run is False
+    assert brief.load(briefs_file)[1] == []
+
+
+def test_cleared_counts_cvs_not_files(briefs_file, tmp_path, tracked, isolated_tailored, capsys):
+    slug = "anthropic-red-team-engineer-safeguards"
+    make_cv(isolated_tailored, slug, "Your_Name_CV.pdf")
+    make_cv(isolated_tailored, slug, "Your_Name_CV.docx")
+    run(["applied", "1"], briefs_file, tmp_path)
+    run(["aborted", "2"], briefs_file, tmp_path)
+    run(["close"], briefs_file, tmp_path, tracked.path)
+    assert "Cleared 1 tailored CV(s)" in capsys.readouterr().out

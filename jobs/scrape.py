@@ -23,6 +23,7 @@ import argparse
 import concurrent.futures as cf
 import json
 import sys
+from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -30,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from jobs import discover, review, settings, sources  # noqa: E402
 from jobs import tailor as tl  # noqa: E402
+from jobs.progress import Report, emit, printer  # noqa: E402
 from jobs.score import (  # noqa: E402
     Scored,
     dedupe_key,
@@ -46,6 +48,7 @@ def collect(
     wanted: list[str] | None,
     ashby: list[str] | None = None,
     queries: list[str] | None = None,
+    report: Report | None = None,
 ) -> tuple[list[sources.Posting], list[str]]:
     """Fetch every source in parallel. One failing board must not kill the run.
 
@@ -89,13 +92,24 @@ def collect(
     # 24, not 12: discovered Ashby boards run to four figures, each one small request.
     with cf.ThreadPoolExecutor(max_workers=24) as pool:
         futures = {pool.submit(fn): name for name, fn in jobs.items()}
-        for fut in cf.as_completed(futures):
+        for done, fut in enumerate(cf.as_completed(futures), 1):
             name = futures[fut]
             try:
                 got = fut.result()
                 out.extend(got)
+                mark = f"✓ {len(got)}"
             except Exception as exc:  # noqa: BLE001
                 problems.append(f"{name}: {type(exc).__name__}")
+                mark = "✗"
+            # Emitted here, in the calling thread, never from a worker - see jobs.progress.
+            emit(
+                report,
+                "fetch",
+                f"{done}/{len(futures)} {name} {mark}",
+                done=done,
+                total=len(futures),
+                detail=True,
+            )
     return out, problems
 
 
@@ -165,7 +179,10 @@ def save_leads(store: Store, leads: list[Scored]) -> list[Application]:
 
 
 def make_cvs(leads: list[Scored]) -> None:
-    """Generate one CV tailored to each posting, plus a per-day briefing sheet."""
+    """Generate one CV tailored to each posting, plus a per-day briefing sheet.
+
+    CLI helper - called only from main(), for the one-shot `--cv` flow.
+    """
     from jobs import brief as br
     from jobs import tailor as tl
 
@@ -182,13 +199,14 @@ def make_cvs(leads: list[Scored]) -> None:
             "kept in cv/out/tailored/BRIEFS.prev.md"
         )
     print(f"  {len(made)} tailored CV(s) in cv/out/tailored/")
-    print(f"  briefing sheet: {sheet.relative_to(HERE.parent)}")
+    print(f"  briefing sheet: {tl.display_path(sheet)}")
     for t in tailors[:5]:
         gaps = ", ".join(t["gaps"][:4]) or "none"
         print(f"    · {t['company'][:28]:<28} matched {len(t['matched']):>2} | gaps: {gaps}")
 
 
 def show(leads: list[Scored], limit: int) -> None:
+    """The console table. CLI helper - called only from main()."""
     if not leads:
         print("No new qualifying postings today.")
         return
@@ -204,6 +222,72 @@ def show(leads: list[Scored], limit: int) -> None:
             f"{', '.join(s.reasons[:3])}"
         )
     print("-" * 132)
+
+
+@dataclass
+class ScrapeResult:
+    raw: int
+    problems: list[str]
+    leads: list[Scored]
+    sheet: Path | None
+    boards: int
+    pruned: int
+    example_settings: bool
+
+
+def run(
+    *,
+    sources: list[str] | None,
+    min_score: int | None,
+    store: Store,
+    include_tracked: bool = False,
+    report: Report | None = None,
+) -> ScrapeResult:
+    """Fetch every source, rank against settings.json, write TODAY_SCRAPING.md.
+
+    Raises settings.SettingsError for unreadable settings. Writes nothing to jobtrack.
+    """
+    cfg = settings.current()
+    if cfg.is_example:
+        emit(
+            report,
+            "fetch",
+            "note: scoring against jobs/settings.example.json - copy it to "
+            "jobs/settings.json and make it yours, or these rankings are someone else's.",
+        )
+    # Ashby: the curated boards plus everything jobs.discover found, minus the pruned.
+    board_state = discover.load_state()
+    run_day = date.today()
+    ashby, pruned = discover.ashby_plan(
+        TARGETS.get("ashby", []), board_state, discover.rejections(store), run_day
+    )
+    emit(report, "fetch", f"Fetching sources… ({len(ashby)} Ashby boards, {len(pruned)} pruned)")
+    if not board_state["boards"]:
+        emit(report, "fetch", "  tip: `python -m jobs.discover` widens Ashby beyond targets.json")
+    postings, problems = collect(sources, ashby, cfg.search_queries, report=report)
+    raw = len(postings)
+    emit(report, "fetch", f"  {raw} raw postings")
+    if problems:
+        emit(report, "fetch", f"  {len(problems)} source(s) unavailable: {', '.join(problems[:6])}")
+    _refresh_boards(board_state, ashby, postings, problems, run_day, sources)
+    postings = drop_stale_discovered(postings, TARGETS.get("ashby", []), run_day)
+    seen = set() if include_tracked else already_tracked(store)
+
+    # `exclude=` rather than filtering the result: the per-company cap inside rank()
+    # must not spend a company's daily slots on roles already in jobtrack. See rank().
+    leads = rank(postings, min_score=min_score, exclude=seen, settings=cfg)
+    rejected = len(postings) - len(leads)
+    emit(
+        report,
+        "rank",
+        f"  {len(leads)} qualify after filtering ({rejected} filtered out or already tracked)",
+    )
+    for s in leads:
+        s.tailor = tl.tailor_for(s.posting, s.variant)
+    sheet = review.write_sheet(leads, today()) if leads else None
+    if sheet:
+        emit(report, "write", f"{len(leads)} lead(s) written", detail=True)
+    return ScrapeResult(raw, problems, leads, sheet, len(ashby), len(pruned), cfg.is_example)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -224,49 +308,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
+    store = Store(args.file or default_path())
     try:
-        cfg = settings.current()
+        result = run(
+            sources=args.sources,
+            min_score=args.min_score,
+            store=store,
+            include_tracked=args.include_tracked,
+            report=printer(),
+        )
     except settings.SettingsError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    if cfg.is_example:
-        print(
-            "note: scoring against jobs/settings.example.json - copy it to "
-            "jobs/settings.json and make it yours, or these rankings are someone else's."
-        )
-    store = Store(args.file or default_path())
-
-    # Ashby: the curated boards plus everything jobs.discover found, minus the pruned.
-    board_state = discover.load_state()
-    run_day = date.today()
-    ashby, pruned = discover.ashby_plan(
-        TARGETS.get("ashby", []), board_state, discover.rejections(store), run_day
-    )
-    print(f"Fetching sources… ({len(ashby)} Ashby boards, {len(pruned)} pruned)")
-    if not board_state["boards"]:
-        print("  tip: `python -m jobs.discover` widens Ashby beyond targets.json")
-    postings, problems = collect(args.sources, ashby, cfg.search_queries)
-    print(f"  {len(postings)} raw postings")
-    if problems:
-        print(f"  {len(problems)} source(s) unavailable: {', '.join(problems[:6])}")
-    _refresh_boards(board_state, ashby, postings, problems, run_day, args.sources)
-    postings = drop_stale_discovered(postings, TARGETS.get("ashby", []), run_day)
-    seen = set() if args.include_tracked else already_tracked(store)
-
-    # `exclude=` rather than filtering the result: the per-company cap inside rank()
-    # must not spend a company's daily slots on roles already in jobtrack. See rank().
-    leads = rank(postings, min_score=args.min_score, exclude=seen, settings=cfg)
-    rejected = len(postings) - len(leads)
-    print(f"  {len(leads)} qualify after filtering ({rejected} filtered out or already tracked)")
+    leads = result.leads
 
     show(leads, args.limit)
     # --limit is a display setting. Everything that qualified goes to the sheet, so a
     # lead is never dropped just because it fell past the end of the printed table.
-    for s in leads:
-        s.tailor = tl.tailor_for(s.posting, s.variant)
-    if leads:
-        sheet = review.write_sheet(leads, today())
-        print(f"\n{len(leads)} lead(s) written to {sheet.relative_to(HERE.parent)}")
+    if result.sheet:
+        print(f"\n{len(leads)} lead(s) written to {tl.display_path(result.sheet)}")
         print("Tick the ones you want, then:  python -m jobs.pick")
 
     # --save/--cv keep the original one-shot behaviour for anyone who wants it, and are

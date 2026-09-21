@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -20,12 +21,26 @@ sys.path.insert(0, str(ROOT / "cv"))
 import build as cvbuild  # noqa: E402  (cv/build.py - stdlib only, no import side effects)
 
 from jobs import settings  # noqa: E402
+from jobs.progress import Report, emit  # noqa: E402
 
 MAX_PAGES = cvbuild.MAX_PAGES
 TAILORED_DIR = ROOT / "cv" / "out" / "tailored"
 
 PROFILE_PATH = ROOT / "cv" / "profile.json"
 EXAMPLE_PROFILE_PATH = ROOT / "cv" / "profile.example.json"
+
+
+def display_path(path: Path) -> str:
+    """Repo-relative when it is inside the repo, absolute otherwise.
+
+    --briefs, --file and test sandboxes can point anywhere, and Path.relative_to raises
+    rather than falling back - which turned a successful build into a traceback after
+    the work was already done.
+    """
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _profile() -> dict:
@@ -113,13 +128,14 @@ def tailor_for(posting, variant: str, *, max_keywords: int = 14) -> dict:
 
 
 def write_jd(
-    company: str, title: str, text: str, slug: str, tailored: Path = TAILORED_DIR
+    company: str, title: str, text: str, slug: str, tailored: Path | None = None
 ) -> Path | None:
     """Save the full posting text next to its tailored CV, so it survives past the day it
     was pasted or scraped - TODAY_SCRAPING.json is overwritten by the next day's scrape,
     and jobs.paste never kept the raw text at all. `jobs.brief close` copies this on into
     applications/<slug>/ when the posting is actually applied to.
     """
+    tailored = tailored or TAILORED_DIR
     text = (text or "").strip()
     if not text:
         return None
@@ -129,6 +145,22 @@ def write_jd(
     return dest
 
 
+@dataclass
+class CvResult:
+    """One tailored CV, as built. The DOCX is always kept; the PDF is an extra."""
+
+    company: str
+    variant: str
+    docx: Path | None = None
+    pdf: Path | None = None
+    engine: str | None = None  # "word" | "libreoffice" | None when no PDF was made
+    pages: int | None = None  # None = not checked (no engine, or undetectable)
+    keywords_wanted: int = 0
+    keywords_kept: int = 0
+    warnings: list[str] = field(default_factory=list)
+    error: str = ""  # set by callers that catch a failed build
+
+
 def build(
     tailors: list[dict],
     *,
@@ -136,10 +168,10 @@ def build(
     pages_out: dict[Path, int] | None = None,
     warn: bool = True,
 ) -> list[Path]:
-    """Generate one tailored CV per posting. Returns the PDFs, or the .docx
-    intermediates when pdf=False (build.py deletes those once converted).
+    """Generate one tailored CV per posting, keeping each .docx beside its PDF.
 
-    `pages_out` is passed straight through to build.to_pdf - see fit() below.
+    Returns the PDFs, or the .docx files when pdf=False. Used by the one-shot
+    `jobs.scrape --cv`; pick and paste go through fit().
     """
     profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
     made: list[Path] = []
@@ -149,7 +181,7 @@ def build(
         path, _ = cvbuild.build_variant(profile, t["variant"], tailor=t)
         made.append(path)
     if pdf and made:
-        return cvbuild.to_pdf(made, pages_out=pages_out, warn=warn)
+        return cvbuild.to_pdf(made, keep_docx=True, pages_out=pages_out, warn=warn)
     return made
 
 
@@ -160,7 +192,7 @@ _SHRINK_STEP = 3
 def shrink(matched: list[str]) -> list[str]:
     """One step of the fit() loop: the next shorter keyword list to try.
 
-    Split out from fit() because fit() cannot run without Word, and the rule this
+    Split out from fit() because fit() needs a PDF engine to measure pages, and the rule this
     encodes - never stop on a list too short to deserve its own header - is the part
     worth pinning. Always reaches [] so the loop terminates.
     """
@@ -168,37 +200,44 @@ def shrink(matched: list[str]) -> list[str]:
     return trimmed if len(trimmed) >= MIN_KEYWORDS else []
 
 
-def fit(t: dict) -> tuple[list[Path], int, int]:
+def fit(t: dict, report: Report | None = None) -> CvResult:
     """Build one tailored CV, dropping keywords until it obeys the two-page rule.
 
     The "Most Relevant to <company>" block is the only part of a tailored CV whose
-    length varies with the posting, so it is the only part worth trimming: a
-    keyword-dense description can match 14 skills and push an otherwise two-page
-    variant onto a third. Nothing else is touched, and keywords are dropped from the
-    end - `analyse()` yields them in whitelist order, which is roughly strongest-first.
+    length varies with the posting, so it is the only part worth trimming. Keywords are
+    dropped from the end - `analyse()` yields them in whitelist order, roughly
+    strongest-first.
 
     The last attempt is always an empty list, which makes build_variant drop the block
-    header as well as the bullet. That matters: on a variant with no slack, two
-    keywords still cost the two lines that spill the page, so trimming that stops
-    short of empty never converges.
+    header as well: on a variant with no slack, two keywords still cost the two lines
+    that spill the page, so trimming that stops short of empty never converges.
 
-    Returns (pdfs, pages, keywords actually built) - the third value describes the file
-    on disk, not the trimming that was attempted, because the brief is written from it.
-    pages == 0 means Word was unavailable and nothing could be measured.
+    Without a page count - no PDF engine, or LibreOffice's count undetectable - there is
+    nothing to trim against, so the first build is the result and `pages` stays None.
+    `keywords_kept` describes the file on disk, because the brief is written from `t`.
     """
-    made: list[Path] = []
-    worst = 0
+    result = CvResult(t["company"], t["variant"], keywords_wanted=len(t["matched"]))
+    if not t["variant"]:
+        return result
+    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
     while True:
         pages: dict[Path, int] = {}
-        kept = len(t["matched"])
-        # Only the final, reported build is allowed to warn - see to_pdf(warn=...).
-        made = build([t], pages_out=pages, warn=False)
-        if not made or not pages:
-            return made, 0, kept
-        worst = max(pages.values())
-        if worst <= MAX_PAGES or kept == 0:
-            return made, worst, kept
+        engines: dict[Path, str] = {}
+        warnings: list[str] = []
+        docx, _ = cvbuild.build_variant(profile, t["variant"], tailor=t, warnings=warnings)
+        made = cvbuild.to_pdf(
+            [docx], keep_docx=True, pages_out=pages, engines_out=engines, warnings=warnings
+        )
+        result.docx = docx
+        result.pdf = made[0] if made else None
+        result.engine = engines.get(result.pdf) if result.pdf else None
+        result.pages = pages.get(result.pdf) if result.pdf else None
+        result.keywords_kept = len(t["matched"])
+        result.warnings = warnings
+        if result.pages is None or result.pages <= MAX_PAGES or not t["matched"]:
+            return result
         t["matched"] = shrink(t["matched"])
+        emit(report, "tailor", f"trimmed to {len(t['matched'])} keywords, rebuilding", detail=True)
 
 
 def _stash(out: Path) -> Path | None:

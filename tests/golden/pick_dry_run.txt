@@ -1,0 +1,7 @@
+exit=0
+--- stdout
+  take  #1  Roblox — QA Analyst
+  drop  #2  Riot
+
+--dry-run: would build 1 CV(s), nothing written.
+--- stderr

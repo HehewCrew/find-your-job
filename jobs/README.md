@@ -134,7 +134,8 @@ Marking only rewrites a `**Status:**` line, so editing BRIEFS.md by hand works j
 `close` requires every brief to be marked (`--force` overrides, discarding the unmarked) and
 then, for each one applied:
 
-- creates `applications/<posting-slug>/` holding the tailored CV, the full job description
+- creates `applications/<posting-slug>/` holding the tailored CV (the `.docx`, and the
+  `.pdf` when Word or LibreOffice made one), the full job description
   (`jd.md`, if one was saved — see below), and a `questions.md` for whatever the application
   form asked.
 - flips the `jobtrack` entry to `applied`, dated when you marked it, with the CV noted.

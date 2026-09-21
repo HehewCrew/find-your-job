@@ -14,6 +14,13 @@ from jobtrack.models import Application  # noqa: E402
 from jobtrack.storage import Store  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def no_real_store(tmp_path, monkeypatch):
+    """Any code path that falls back to default_path() lands in tmp_path, never in the
+    repo's own applications.json - which is what one test once wrote to."""
+    monkeypatch.setenv("JOBTRACK_FILE", str(tmp_path / "default-applications.json"))
+
+
 @pytest.fixture
 def store_path(tmp_path):
     return tmp_path / "applications.json"
@@ -35,3 +42,50 @@ def sample_apps(store):
     store.add(Application(id=3, company="Initech", role="SRE", status="rejected"))
     store.save()
     return store
+
+
+ROOT = FIXTURES.parent.parent
+GOLDEN = FIXTURES.parent / "golden"
+
+
+@pytest.fixture
+def cv_sandbox(tmp_path, monkeypatch):
+    """Build tailored CVs into tmp_path from the example profile, with no PDF engine.
+
+    Word and LibreOffice are both reported missing, so the result is the same on every
+    machine: a .docx and no PDF. Returns the sandbox's `cv/out`.
+    """
+    from jobs import brief
+    from jobs import tailor as tl
+
+    out = tmp_path / "cvout"
+    monkeypatch.setattr(tl.cvbuild, "OUT_DIR", out)
+    monkeypatch.setattr(tl, "TAILORED_DIR", out / "tailored")
+    monkeypatch.setattr(brief, "TAILORED_DIR", out / "tailored")
+    monkeypatch.setattr(tl, "PROFILE_PATH", ROOT / "cv" / "profile.example.json")
+    monkeypatch.setattr(tl.cvbuild, "_word_to_pdf", lambda paths, **kw: [])
+    monkeypatch.setattr(tl.cvbuild, "_find_soffice", lambda: None)
+    return out
+
+
+@pytest.fixture
+def golden(tmp_path):
+    """Compare a CLI run to tests/golden/<name>.txt; UPDATE_GOLDEN=1 rewrites it.
+
+    tmp_path is replaced by <tmp> and backslashes by slashes, so the file is the same on
+    every machine and OS.
+    """
+
+    def check(name: str, code: int, out: str, err: str) -> None:
+        text = f"exit={code}\n--- stdout\n{out}--- stderr\n{err}"
+        text = text.replace(str(tmp_path), "<tmp>").replace("\\", "/")
+        path = GOLDEN / f"{name}.txt"
+        if os.environ.get("UPDATE_GOLDEN"):
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+            return
+        if not path.exists():
+            pytest.fail(f"no golden file {path.name}; run once with UPDATE_GOLDEN=1")
+        assert text == path.read_text(encoding="utf-8")
+
+    return check

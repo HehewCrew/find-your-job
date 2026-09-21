@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,6 +31,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from jobs import review, settings  # noqa: E402
 from jobs import tailor as tl  # noqa: E402
 from jobs.brief import BRIEFS_PATH  # noqa: E402
+from jobs.errors import JobsError  # noqa: E402
+from jobs.progress import Report, emit, printer  # noqa: E402
 from jobtrack.models import Application, ValidationError, today  # noqa: E402
 from jobtrack.storage import Store, default_path  # noqa: E402
 
@@ -78,6 +81,126 @@ def cmd_list(leads: list[review.Lead]) -> int:
     return 0
 
 
+def choose(
+    leads: list[review.Lead], selectors: list[str], sheet_name: str
+) -> tuple[list[review.Lead], list[review.Lead]]:
+    """(taken, dropped): the selectors if given, else the `[x]` ticks; `[-]` is dropped."""
+    taken = (
+        review.select(leads, selectors)
+        if selectors
+        else [lead for lead in leads if lead.mark == review.TAKE]
+    )
+    dropped = [lead for lead in leads if lead.mark == review.SKIP]
+    if not taken and not dropped:
+        raise JobsError(
+            f"Nothing ticked on {sheet_name}. Mark a heading `[x]`, "
+            "or pass lead numbers: python -m jobs.pick 1 4 9"
+        )
+    return taken, dropped
+
+
+@dataclass
+class PickResult:
+    taken: list[review.Lead]
+    dropped: list[review.Lead]
+    cvs: list[tl.CvResult]
+    briefs_path: Path
+
+
+def cv_line(t: dict, cv: tl.CvResult) -> str:
+    """The terminal line for one built CV - also the UI's progress message.
+
+    Precedence is the old one: a missing PDF outranks an over-long one, which outranks
+    a trimmed keyword block.
+    """
+    note = ""
+    if cv.error:
+        note = f"  !! failed: {cv.error}"
+    elif not cv.pdf:
+        note = "  (no PDF - Word unavailable, .docx only)"
+    elif (cv.pages or 0) > tl.MAX_PAGES:
+        note = f"  !! {cv.pages} pages - check before sending"
+    elif cv.keywords_kept < cv.keywords_wanted:
+        note = (
+            f"  (trimmed {cv.keywords_wanted}->{cv.keywords_kept} keywords "
+            f"to hold {tl.MAX_PAGES} pages)"
+        )
+    return f"  · {t['company'][:26]:<26} {t['variant']:<18}{note}"
+
+
+def run(
+    taken: list[review.Lead],
+    dropped: list[review.Lead],
+    *,
+    briefs: Path,
+    store: Store,
+    report: Report | None = None,
+) -> PickResult:
+    """Record the leads in jobtrack, build one CV per taken lead, append their briefs.
+
+    A CV that fails is recorded in its CvResult.error; the others still build and still
+    get their briefs - one Word crash must not lose a batch.
+    """
+    tailors: list[dict] = []
+    for lead in taken:
+        t = _tailor_dict(lead)
+        store.add(
+            Application(
+                id=store.next_id(),
+                company=lead.company,
+                role=lead.title or lead.label,
+                status="wishlist",
+                url=lead.url,
+                location=lead.data.get("location") or "Remote",
+                notes=[
+                    f"score {lead.data.get('score', '?')} | cv: {t['variant']}"
+                    + (f" | {', '.join(lead.data.get('reasons', []))}" if lead.data else ""),
+                    f"source: {lead.data.get('source', 'review sheet')}",
+                ],
+            )
+        )
+        tl.write_jd(t["company"], t["job_title"], lead.data.get("description", ""), t["slug"])
+        tailors.append(t)
+    for lead in dropped:
+        store.add(
+            Application(
+                id=store.next_id(),
+                company=lead.company,
+                role=lead.title or lead.label,
+                status="withdrawn",
+                url=lead.url,
+                location=lead.data.get("location") or "",
+                notes=[f"dropped at review {today()} - not pursued"],
+            )
+        )
+    store.save()
+
+    cvs: list[tl.CvResult] = []
+    built: list[dict] = []
+    if tailors:
+        emit(report, "tailor", f"\nTailoring {len(tailors)} CV(s)…")
+    for i, t in enumerate(tailors, 1):
+        emit(
+            report,
+            "tailor",
+            f"Tailoring {i}/{len(tailors)}: {t['company']}",
+            done=i - 1,
+            total=len(tailors),
+            detail=True,
+        )
+        try:
+            cv = tl.fit(t, report=report)
+            built.append(t)
+        # build_variant raises SystemExit for a variant missing from profile.json.
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
+            cv = tl.CvResult(t["company"], t["variant"], error=str(exc) or type(exc).__name__)
+        cvs.append(cv)
+        emit(report, "tailor", cv_line(t, cv), done=i, total=len(tailors))
+    if built:
+        tl.append_briefs(built, briefs)
+    return PickResult(taken, dropped, cvs, briefs)
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -100,84 +223,34 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No sheet at {args.sheet.name}. Run: python -m jobs.scrape", file=sys.stderr)
         return 1
 
-    chosen = (
-        review.select(leads, args.selectors)
-        if args.selectors
-        else [lead for lead in leads if lead.mark == review.TAKE]
-    )
-    dropped = [lead for lead in leads if lead.mark == review.SKIP]
-    if not chosen and not dropped:
-        print(
-            f"Nothing ticked on {args.sheet.name}. Mark a heading `[x]`, "
-            "or pass lead numbers: python -m jobs.pick 1 4 9",
-            file=sys.stderr,
-        )
+    try:
+        taken, dropped = choose(leads, args.selectors, args.sheet.name)
+    except JobsError as exc:
+        print(exc, file=sys.stderr)
         return 1
 
-    for lead in chosen:
+    for lead in taken:
         print(f"  take  #{lead.index}  {lead.company} — {lead.title or lead.label}")
     for lead in dropped:
         print(f"  drop  #{lead.index}  {lead.company}")
     if args.dry_run:
-        print(f"\n--dry-run: would build {len(chosen)} CV(s), nothing written.")
+        print(f"\n--dry-run: would build {len(taken)} CV(s), nothing written.")
         return 0
 
-    store = Store(args.file or default_path())
-    tailors: list[dict] = []
-    for lead in chosen:
-        t = _tailor_dict(lead)
-        store.add(
-            Application(
-                id=store.next_id(),
-                company=lead.company,
-                role=lead.title or lead.label,
-                status="wishlist",
-                url=lead.url,
-                location=lead.data.get("location") or "Remote",
-                notes=[
-                    f"score {lead.data.get('score', '?')} | cv: {t['variant']}"
-                    + (f" | {', '.join(lead.data.get('reasons', []))}" if lead.data else ""),
-                    f"source: {lead.data.get('source', 'review sheet')}",
-                ],
-            )
-        )
-        tl.write_jd(t["company"], t["job_title"], lead.data.get("description", ""), t["slug"])
-        tailors.append(t)
-
-    for lead in dropped:
-        store.add(
-            Application(
-                id=store.next_id(),
-                company=lead.company,
-                role=lead.title or lead.label,
-                status="withdrawn",
-                url=lead.url,
-                location=lead.data.get("location") or "",
-                notes=[f"dropped at review {today()} - not pursued"],
-            )
-        )
-    store.save()
-
-    if tailors:
-        print(f"\nTailoring {len(tailors)} CV(s)…")
-        for t in tailors:
-            wanted = len(t["matched"])
-            made, pages, kept = tl.fit(t)
-            note = ""
-            if kept < wanted:
-                note = f"  (trimmed {wanted}->{kept} keywords to hold {tl.MAX_PAGES} pages)"
-            if pages > tl.MAX_PAGES:
-                note = f"  !! {pages} pages - check before sending"
-            if not made:
-                note = "  (no PDF - Word unavailable, .docx only)"
-            print(f"  · {t['company'][:26]:<26} {t['variant']:<18}{note}")
-        tl.append_briefs(tailors, args.briefs)
-        print(f"\n  {len(tailors)} brief(s) appended to {args.briefs.relative_to(ROOT)}")
-
+    result = run(
+        taken,
+        dropped,
+        briefs=args.briefs,
+        store=Store(args.file or default_path()),
+        report=printer(),
+    )
+    built = [cv for cv in result.cvs if not cv.error]
+    if built:
+        print(f"\n  {len(built)} brief(s) appended to {tl.display_path(args.briefs)}")
     if dropped:
         print(f"  {len(dropped)} lead(s) recorded as withdrawn - they won't be scraped again.")
     print("\nNext: apply, then  python -m jobs.brief applied <n>")
-    return 0
+    return 1 if len(built) < len(result.cvs) else 0
 
 
 if __name__ == "__main__":

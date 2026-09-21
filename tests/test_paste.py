@@ -13,10 +13,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest  # noqa: E402
+from jobs import paste  # noqa: E402
 from jobs import tailor as tl  # noqa: E402
 from jobs.brief import parse  # noqa: E402
+from jobs.errors import Skipped  # noqa: E402
 from jobs.paste import company_from_url, guess_title, variants  # noqa: E402
 from jobs.score import _families, pick_variant  # noqa: E402
+
+from jobtrack.storage import Store  # noqa: E402
 
 JD = """Apply now
 Share
@@ -294,3 +298,64 @@ def test_write_briefs_and_append_briefs_render_the_same_block(tmp_path):
     tl.write_briefs([_tailor()], a)
     tl.append_briefs([_tailor()], b)
     assert parse(a.read_text(encoding="utf-8"))[0] == parse(b.read_text(encoding="utf-8"))[0]
+
+
+def test_display_path_is_repo_relative_inside_the_repo():
+    assert tl.display_path(tl.ROOT / "cv" / "x.pdf").replace("\\", "/") == "cv/x.pdf"
+
+
+def test_display_path_falls_back_to_absolute_outside_the_repo(tmp_path):
+    assert tl.display_path(tmp_path / "x.pdf") == str(tmp_path / "x.pdf")
+
+
+def test_write_jd_follows_a_patched_tailored_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(tl, "TAILORED_DIR", tmp_path)
+    path = tl.write_jd("Acme", "QA", "the text", "acme-qa")
+    assert path == tmp_path / "acme-qa" / "jd.md"
+
+
+LONG_JD = JD + "\nFully remote, worldwide. " * 3
+
+
+def test_build_writes_the_cv_brief_and_jd(tmp_path, cv_sandbox):
+    a = paste.assess(
+        LONG_JD,
+        company="Acme",
+        title="Senior QA Automation Engineer",
+        variant="qa_gaming",
+        use_llm=False,
+    )
+    events = []
+    result = paste.build(a, LONG_JD, force=True, briefs=tmp_path / "B.md", report=events.append)
+    assert result.cv.docx.exists()
+    assert result.cv.pdf is None and result.cv.pages is None
+    assert "## Acme" in (tmp_path / "B.md").read_text(encoding="utf-8")
+    assert (cv_sandbox / "tailored" / a.tailor["slug"] / "jd.md").exists()
+    assert result.app_id is None
+    assert [e.stage for e in events] == ["tailor"]
+
+
+def test_build_refuses_a_skip_unless_forced(tmp_path, cv_sandbox):
+    a = paste.assess(
+        LONG_JD,
+        company="Acme",
+        title="Senior QA Automation Engineer",
+        variant="qa_gaming",
+        use_llm=False,
+    )
+    a.rules = paste.llm.Verdict("skip", blockers=["US only"])
+    with pytest.raises(Skipped) as caught:
+        paste.build(a, LONG_JD, briefs=tmp_path / "B.md")
+    assert caught.value.assessment is a
+    assert not (tmp_path / "B.md").exists()
+    assert paste.build(a, LONG_JD, force=True, briefs=tmp_path / "B.md").forced is True
+
+
+def test_build_can_save_to_jobtrack(tmp_path, cv_sandbox):
+    a = paste.assess(
+        LONG_JD, company="Acme", title="QA Engineer", variant="qa_gaming", use_llm=False
+    )
+    store = Store(tmp_path / "applications.json").load()
+    result = paste.build(a, LONG_JD, force=True, save=True, store=store, briefs=tmp_path / "B.md")
+    saved = Store(tmp_path / "applications.json").load().get(result.app_id)
+    assert saved.status == "wishlist" and saved.company == "Acme"
