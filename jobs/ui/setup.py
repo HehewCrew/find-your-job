@@ -389,3 +389,242 @@ SCHEMAS: dict[str, dict[str, dict]] = {
         },
     },
 }
+
+
+# --- the guided start: cv/init.py's interview as one form --------------------------
+
+
+def _init_module():
+    """cv/init.py, which is a script rather than a package - loaded by path."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("fyj_cv_init", tl.ROOT / "cv" / "init.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def guided_template() -> dict:
+    """The blank answers the guided start's form begins from."""
+    return {
+        "contact": {"name": "", "phone": "", "email": "", "location": ""},
+        "links": {"linkedin": {"label": "LinkedIn", "url": ""}},
+        "headline": "",
+        "years": "nearly 5 years",
+        "ai_tools": "",
+        "summary": "",
+        "skill_groups": {"core": {"title": "", "items": []}},
+        "roles": [
+            {
+                "id": "",
+                "title": "",
+                "org": "",
+                "location": "",
+                "start": "",
+                "end": "Present",
+                "bullets": [],
+            }
+        ],
+        "education": [{"degree": "", "school": "", "start": "", "end": ""}],
+        "certifications": [],
+        "languages": "English (fluent)",
+        "variant_key": "",
+        "filename": "",
+        "folder": "",
+    }
+
+
+GUIDED_SCHEMA: dict[str, dict] = {
+    "contact": {"label": "Contact details (printed at the top of every CV)"},
+    "contact.phone": {"label": "Phone, with country code"},
+    "contact.location": {"label": "Location, as it should print"},
+    "links": {
+        "label": "Links (LinkedIn, portfolio...)",
+        "map": True,
+        "template": {"label": "", "url": ""},
+    },
+    "headline": {"label": "Headline under your name, e.g. Automation engineer | QA"},
+    "years": {"label": "Years of experience, in words"},
+    "ai_tools": {"label": "AI tools you use daily (optional)"},
+    "summary": {
+        "label": "Professional summary - {years} and {ai_tools} fill themselves in",
+        "long": True,
+    },
+    "skill_groups": {
+        "label": "Skill groups, two to four",
+        "map": True,
+        "template": {"title": "", "items": []},
+    },
+    "skill_groups.*.items": {"label": "Skills, one per line"},
+    "roles": {"label": "Work experience, newest first", "template": guided_template()["roles"][0]},
+    "roles.*.id": {"label": "Short id (letters, digits, _), e.g. acme_qa"},
+    "roles.*.start": {"label": "Start (MM/YYYY)"},
+    "roles.*.end": {"label": "End (MM/YYYY, or Present)"},
+    "roles.*.bullets": {"label": "What you owned and changed, one per line"},
+    "education": {"label": "Education", "template": guided_template()["education"][0]},
+    "education.*.start": {"label": "Start (MM/YYYY)"},
+    "education.*.end": {"label": "End (MM/YYYY)"},
+    "certifications": {"label": "Certifications, one per line (optional)"},
+    "languages": {"label": "Languages, as one line"},
+    "variant_key": {"label": "A short name for this first CV (letters, digits, _), e.g. qa"},
+    "filename": {"label": "File name for the CV (optional)"},
+    "folder": {"label": "Folder name under cv/out/ (optional)"},
+}
+
+
+def _require(value, what: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        raise ValidationError(f"Fill in {what}.")
+    return text
+
+
+def start_profile(paths: Paths, answers: dict) -> dict:
+    """Create profile.json from the guided form - the same questions as cv/init.py."""
+    from jobs.errors import JobsError
+
+    if paths.profile.exists():
+        raise JobsError("You already have a profile - edit it instead.")
+    init = _init_module()
+
+    def date(value, what: str, *, present: bool = False) -> str:
+        text = _require(value, what)
+        if present and text.lower() in ("present", "now", "current"):
+            return "Present"
+        if not init.DATE_RE.match(text):
+            raise ValidationError(f"{what}: write it as MM/YYYY, e.g. 03/2021.")
+        return text
+
+    def slug(value, what: str) -> str:
+        text = _require(value, what)
+        if not init.SLUG_RE.match(text):
+            raise ValidationError(
+                f"{what}: use lower-case letters, digits and _ only, starting with a letter."
+            )
+        return text
+
+    c = answers.get("contact") or {}
+    contact = {
+        "name": _require(c.get("name"), "your name"),
+        "phone": str(c.get("phone") or "").strip(),
+        "email": _require(c.get("email"), "your email"),
+        "location": str(c.get("location") or "").strip(),
+    }
+    if not init.EMAIL_RE.match(contact["email"]):
+        raise ValidationError("Your email does not look like an email address.")
+
+    links = {}
+    for key, link in (answers.get("links") or {}).items():
+        if isinstance(link, dict) and str(link.get("url") or "").strip():
+            links[slug(key, "Each link's short name")] = {
+                "label": _require(link.get("label"), f"the text shown for the {key} link"),
+                "url": str(link["url"]).strip(),
+            }
+
+    groups = {}
+    for key, group in (answers.get("skill_groups") or {}).items():
+        items = [str(i).strip() for i in (group or {}).get("items", []) if str(i).strip()]
+        if items:
+            groups[slug(key, "Each skill group's short name")] = {
+                "title": _require(group.get("title"), f"a heading for the {key} skill group"),
+                "items": items,
+            }
+    if not groups:
+        raise ValidationError("Add at least one skill group with skills in it.")
+
+    roles = []
+    for i, r in enumerate(answers.get("roles") or [], 1):
+        if not any(str(r.get(k) or "").strip() for k in ("title", "org", "id")):
+            continue  # a blank row the form left behind
+        role = {
+            "id": slug(r.get("id"), f"Role {i}'s short id"),
+            "title": _require(r.get("title"), f"role {i}'s job title"),
+            "org": _require(r.get("org"), f"role {i}'s employer"),
+            "start": date(r.get("start"), f"Role {i}'s start date"),
+            "end": date(r.get("end"), f"Role {i}'s end date", present=True),
+            "bullets": [str(b).strip() for b in r.get("bullets") or [] if str(b).strip()],
+        }
+        if not role["bullets"]:
+            raise ValidationError(f"Role {i} needs at least one bullet.")
+        if str(r.get("location") or "").strip():
+            role["location"] = str(r["location"]).strip()
+        roles.append(role)
+    if not roles:
+        raise ValidationError("Add at least one role - the CV is built around them.")
+
+    education = []
+    for i, e in enumerate(answers.get("education") or [], 1):
+        if not any(str(e.get(k) or "").strip() for k in ("degree", "school")):
+            continue
+        education.append(
+            {
+                "degree": _require(e.get("degree"), f"education {i}'s degree"),
+                "school": _require(e.get("school"), f"education {i}'s institution"),
+                "start": date(e.get("start"), f"Education {i}'s start date"),
+                "end": date(e.get("end"), f"Education {i}'s end date"),
+            }
+        )
+
+    key = slug(answers.get("variant_key"), "The CV's short name")
+    surname = contact["name"].split()[-1]
+    filename = str(answers.get("filename") or "").strip()
+    folder = str(answers.get("folder") or "").strip()
+    profile = init.assemble(
+        {
+            "contact": contact,
+            "links": links,
+            "headline": _require(answers.get("headline"), "a headline").upper(),
+            "years": str(answers.get("years") or "").strip(),
+            "ai_tools": str(answers.get("ai_tools") or "").strip(),
+            "summary": _require(answers.get("summary"), "a summary"),
+            "skill_groups": groups,
+            "roles": roles,
+            "education": education,
+            "certifications": [
+                str(x).strip() for x in answers.get("certifications") or [] if str(x).strip()
+            ],
+            "languages": str(answers.get("languages") or "").strip(),
+            "variant_key": key,
+            "variant": {
+                "filename": filename or f"{surname}_{key.title().replace('_', '')}_CV",
+                "folder": folder or key.replace("_", " ").title(),
+            },
+        }
+    )
+    return save(paths, "profile", {"data": profile})
+
+
+# --- preview -----------------------------------------------------------------------
+
+
+def preview(paths: Paths, variant: str, report) -> dict:
+    """Build one CV variant into cv/out/preview/, with the PDF step, to look at."""
+    from jobs.errors import JobsError
+    from jobs.progress import emit
+
+    if not paths.profile.exists():
+        raise JobsError("Save your profile first - the preview builds from the saved file.")
+    profile = _read_json(paths.profile)
+    if variant not in (profile.get("variants") or {}):
+        raise ValidationError(f"Your profile has no CV called {variant!r}.")
+    emit(report, "tailor", f"Building the {variant} CV…")
+    warnings: list[str] = []
+    pages: dict[Path, int] = {}
+    engines: dict[Path, str] = {}
+    docx, _ = tl.cvbuild.build_variant(profile, variant, warnings=warnings, out_dir=paths.preview)
+    made = tl.cvbuild.to_pdf(
+        [docx], keep_docx=True, pages_out=pages, engines_out=engines, warnings=warnings
+    )
+    pdf = made[0] if made else None
+
+    def rel(p: Path | None) -> str | None:
+        return None if p is None else p.relative_to(paths.root).as_posix()
+
+    return {
+        "variant": variant,
+        "docx": rel(docx),
+        "pdf": rel(pdf),
+        "pages": pages.get(pdf) if pdf else None,
+        "engine": engines.get(pdf) if pdf else None,
+        "warnings": warnings,
+    }

@@ -137,3 +137,108 @@ def test_markdown_round_trips(paths):
 def test_an_unknown_file_name_is_refused(paths):
     with pytest.raises(ValidationError):
         setup.load(paths, "passwords")
+
+
+# --- the guided start --------------------------------------------------------------
+
+
+def answers(**over) -> dict:
+    a = setup.guided_template()
+    a.update(
+        {
+            "contact": {
+                "name": "Sam Rivera",
+                "phone": "+351 900 000 000",
+                "email": "sam@example.com",
+                "location": "Lisbon, Portugal",
+            },
+            "headline": "QA engineer | test automation",
+            "summary": "QA engineer with {years} of test automation.",
+            "skill_groups": {"qa": {"title": "QA", "items": ["Test design", "Python"]}},
+            "roles": [
+                {
+                    "id": "acme_qa",
+                    "title": "QA Engineer",
+                    "org": "Acme",
+                    "location": "Lisbon",
+                    "start": "01/2022",
+                    "end": "Present",
+                    "bullets": ["Owned the regression suite"],
+                }
+            ],
+            "education": [
+                {"degree": "BSc Computing", "school": "Uni", "start": "09/2016", "end": "06/2019"}
+            ],
+            "variant_key": "qa",
+        }
+    )
+    a.update(over)
+    return a
+
+
+def test_the_guided_start_writes_a_profile_that_builds(paths, cv_sandbox):
+    setup.start_profile(paths, answers())
+    profile = json.loads(paths.profile.read_text(encoding="utf-8"))
+    assert list(profile["variants"]) == ["qa"]
+    assert profile["variants"]["qa"]["headline"] == "QA ENGINEER | TEST AUTOMATION"
+    assert setup.check_profile(profile) == []
+
+
+def test_the_guided_start_refuses_to_overwrite_a_profile(paths, cv_sandbox):
+    from jobs.errors import JobsError
+
+    setup.start_profile(paths, answers())
+    with pytest.raises(JobsError, match="already"):
+        setup.start_profile(paths, answers())
+
+
+@pytest.mark.parametrize(
+    ("over", "field"),
+    [
+        (
+            {"contact": {"name": "Sam", "phone": "", "email": "not-an-email", "location": ""}},
+            "email",
+        ),
+        (
+            {
+                "roles": [
+                    {
+                        "id": "acme_qa",
+                        "title": "QA",
+                        "org": "Acme",
+                        "start": "2022",
+                        "end": "Present",
+                        "bullets": ["x"],
+                    }
+                ]
+            },
+            "MM/YYYY",
+        ),
+        ({"roles": []}, "role"),
+        ({"variant_key": "My CV"}, "letters"),
+    ],
+)
+def test_the_guided_start_says_what_is_wrong(paths, cv_sandbox, over, field):
+    with pytest.raises(ValidationError, match=field):
+        setup.start_profile(paths, answers(**over))
+    assert not paths.profile.exists()
+
+
+# --- preview -----------------------------------------------------------------------
+
+
+def test_preview_builds_one_cv_into_the_preview_folder(paths, cv_sandbox):
+    setup.start_profile(paths, answers())
+    events = []
+    result = setup.preview(paths, "qa", events.append)
+    docx = paths.root / result["docx"]
+    assert docx.exists() and docx.is_relative_to(paths.preview)
+    assert result["pdf"] is None and result["pages"] is None
+    assert events and events[0].stage == "tailor"
+
+
+def test_preview_needs_a_saved_profile(paths):
+    from jobs.errors import JobsError
+
+    with pytest.raises(JobsError, match="Save"):
+        setup.preview(paths, "qa", None)
