@@ -167,9 +167,9 @@ function renderSteps() {
   ];
   const reached = PHASE_STEP[S.phase] ?? 0;
   $("steps").innerHTML = STEPS.map((name, i) => {
-    const cls = i === step ? "current" : i < reached ? "done" : "";
+    const cls = i === step ? "current" : i < reached ? "done" : i > reached ? "ahead" : "";
     return `<button type="button" class="step ${cls}" role="tab" aria-selected="${i === step}" data-step="${i}">
-      <span class="n num">${i + 1}</span><span class="name">${name}</span>
+      <span class="name">${name}</span>
       <span class="out num">${esc(outs[i])}</span></button>`;
   }).join("");
 }
@@ -216,7 +216,7 @@ async function renderReview() {
             <span class="who"><b>${esc(x.company)}</b>&ensp;${esc(x.title)}</span>
           </button>`).join("")}
       </div>
-      <article class="detail">
+      <article class="detail review">
         <h2>${esc(l.title)}</h2>
         <p class="where">${esc(l.company)}${l.location ? `, ${esc(l.location)}` : ""}</p>
         <div class="decide">
