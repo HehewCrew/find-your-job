@@ -26,6 +26,12 @@
   --warn: #9A5B00;
   --warn-wash: #FBF0DC;
   --bad: #A3322A;
+  --radius: 10px;           /* steps, buttons and the lead list share one corner */
+  --step: #E6EBF7;          /* every step: light blue */
+  --step-ahead: #F1F4FB;    /* steps not reached yet: paler */
+  --panel: #D5DFF4;         /* Review's job details: a stronger light blue than the steps */
+  --panel-soft: #46506A;    /* secondary text on the panel */
+  --panel-rule: #B9C7E8;
   --font: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: light;
 }
@@ -35,6 +41,8 @@
     --rule: #2C323B; --sig: #8EA4EE; --sig-ink: #111827; --sig-wash: #242C44;
     --take: #6CC191; --take-wash: #1E3328; --drop: #6B717B;
     --warn: #E3B061; --warn-wash: #33291A; --bad: #F08A80;
+    --step: #242C44; --step-ahead: #1C212B; --panel: #26324F; --panel-soft: #B4BED3;
+    --panel-rule: #3A4A70;
     color-scheme: dark;
   }
 }
@@ -69,23 +77,20 @@ pre {
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--take); display: inline-block; }
 .engine.none .dot { background: var(--warn); }
 
-/* step bar: the one bold thing */
-.steps {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-  border-top: 3px solid var(--rule); margin-top: 8px;
-}
+/* step bar: the one bold thing. No numbers - the counts under each name are the numbers
+   that matter, and a step number beside "8 leads found" read as a count. */
+.steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
 .step {
-  text-align: left; background: none; border: 0; padding: 14px 12px 12px 0;
-  border-top: 3px solid transparent; margin-top: -3px;
+  text-align: left; background: var(--step); border: 2px solid transparent;
+  border-radius: var(--radius); padding: 10px 14px; min-width: 0;
 }
-.step .n { font-weight: 700; font-size: 26px; line-height: 1; color: var(--ink-soft); }
-.step .name { font-weight: 700; font-size: 17px; margin-left: 6px; color: var(--ink-soft); }
-.step .out { display: block; font-size: 13px; color: var(--ink-soft); margin-top: 6px; min-height: 1.5em; }
-.step.done { border-top-color: var(--ink); }
-.step.done .n, .step.done .name { color: var(--ink); }
-.step.current { border-top-color: var(--sig); }
-.step.current .n, .step.current .name { color: var(--sig); }
+.step .name { display: block; font-weight: 700; font-size: 17px; color: var(--ink); }
+.step .out { display: block; font-size: 13px; color: var(--ink-soft); min-height: 1.5em; }
+.step.current { border-color: var(--sig); }
+.step.current .name { color: var(--sig); }
 .step.current .out { color: var(--ink); }
+.step.ahead { background: var(--step-ahead); }
+.step.ahead .name { color: var(--ink-soft); }
 
 .progress {
   font-size: 14px; color: var(--sig); min-height: 30px; padding-block: 6px;
@@ -99,7 +104,7 @@ pre {
 /* review split */
 .split {
   display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden;
 }
 .list { border-right: 1px solid var(--rule); max-height: 62vh; overflow-y: auto; }
 .row {
@@ -129,10 +134,17 @@ pre {
 }
 .chip.have { background: var(--take-wash); border-color: transparent; }
 .jd { max-width: 72ch; white-space: pre-line; font-size: 14.5px; line-height: 1.6; border-top: 1px solid var(--rule); padding-top: 14px; }
+/* Review's job details sit on a blue panel; Take / Drop / Decide later stay white. */
+.detail.review { background: var(--panel); }
+.detail.review .where, .detail.review .facts dt { color: var(--panel-soft); }
+.detail.review .chip { background: var(--surface); }
+.detail.review .chip.have { background: var(--take-wash); }
+.detail.review .jd { border-top-color: var(--panel-rule); }
+.detail.review .decide .btn { background: #FFFFFF; color: #1F2733; }
 .decide, .actions { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
 
 .btn {
-  border: 1px solid var(--rule); background: var(--surface); padding: 7px 14px; border-radius: 6px;
+  border: 1px solid var(--rule); background: var(--surface); padding: 7px 14px; border-radius: var(--radius);
 }
 .btn:hover:not(:disabled) { border-color: var(--ink-soft); }
 .btn.primary { background: var(--sig); color: var(--sig-ink); border-color: var(--sig); font-weight: 700; }
@@ -206,8 +218,8 @@ input[type="text"] {
 @media (max-width: 760px) {
   .split { grid-template-columns: 1fr; }
   .list { border-right: 0; border-bottom: 1px solid var(--rule); max-height: 320px; }
-  .step .name { display: block; margin: 4px 0 0; font-size: 14px; }
-  .step .n { font-size: 20px; }
+  .steps { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .step .name { font-size: 15px; }
   .step .out { font-size: 12px; }
   .foot .keys { display: none; }
 }
