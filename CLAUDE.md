@@ -65,7 +65,8 @@ jobs/
     tasks.py   One long job at a time on a worker thread; progress as events
     phase.py   The /jobhunt phase table as a pure function
     paths.py   Every file the UI touches, so tests can point it at tmp_path
-    static/    index.html, app.css, app.js, bundled Atkinson Hyperlegible (OFL)
+    setup.py   Setup tab: status, load, validated save (+ .bak), guided profile, CV preview
+    static/    index.html, app.css, app.js (daily loop), setup.js (forms), bundled font (OFL)
   targets.json Greenhouse/Lever/Ashby company boards to poll
   priorities.md  Apply / don't-apply criteria, read in triage  (gitignored; .example tracked)
 TODAY_SCRAPING.md    Today's leads, awaiting [x]/[-]  (regenerated each scrape)
@@ -188,3 +189,10 @@ repo. Don't answer it by describing the state; run the skill.
 - `Paths.tailored` must be where `tailor.TAILORED_DIR` builds. The CV modules use their own
   module-level folders; `Paths` only redirects the sheet, briefs and store, which is why UI
   tests combine `Paths.under(tmp_path)` with `cv_sandbox`.
+- Setup's forms are **drawn from the data**, with `setup.SCHEMAS` only overriding labels,
+  choices and list/map hints (dotted paths, `*` for any index or key). The page sends the whole
+  object back, which is what keeps `_note`s and unlisted keys; don't switch saves to sending
+  only the fields a form shows. A save is checked by `settings.from_dict` or by building every
+  profile variant (`check_profile`) before anything is written.
+- Setup keeps `<file>.bak` on every save. The four `.bak` names are in `.gitignore` next to the
+  files they back up - add the `.bak` too if a fifth personal file ever joins Setup.

@@ -15,7 +15,14 @@ description, with your own API key.
 ## Setting it up for yourself
 
 Everything personal — your CV data, your applications, the day's leads — is gitignored.
-A fresh clone has the tools and none of the contents, so start by making your own:
+A fresh clone has the tools and none of the contents, so start by making your own.
+
+**The easy way:** run `python -m jobs.ui` (after the `pip install` below). The page opens on
+**Setup** when nothing is set up yet: a short guided form creates your CV profile, and the
+other three files start from the examples and are edited as forms. Every save is checked
+first, and the previous version is kept as a `.bak` next to the file.
+
+**The command-line way:**
 
 ```bash
 python -m venv .venv
