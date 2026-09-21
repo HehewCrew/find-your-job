@@ -24,7 +24,6 @@ from jobs import settings  # noqa: E402
 MAX_PAGES = cvbuild.MAX_PAGES
 TAILORED_DIR = ROOT / "cv" / "out" / "tailored"
 
-
 PROFILE_PATH = ROOT / "cv" / "profile.json"
 EXAMPLE_PROFILE_PATH = ROOT / "cv" / "profile.example.json"
 
