@@ -1,0 +1,496 @@
+{
+  "_comment": "TEMPLATE. Copy to cv/profile.json and replace every value with your own. Then run: python cv/build.py. Placeholder content is fictional and exists only to show the shape - none of it is claimable. Read cv/rules.md before writing real content.",
+  "_how_it_fits_together": "A variant names the role ids and skill_group ids it wants; each bullet carries tags saying which variants it belongs to. build.py drops a role entirely if no bullet of its bullets carries the current variant's tag, so every role a variant lists needs at least one bullet tagged for it. All 8 variant keys below must exist - jobs/score.py picks among them by name, and a missing one breaks the daily scrape.",
+  "_choosing_your_variants": "Variant keys are names you choose. jobs/settings.json maps each role family to one (a role's `cv`, plus its `cv_rules`), so every name used there must exist here - the shipped settings.example.json uses exactly these 8. Flesh out the ones you would really apply with and leave the rest as the one-line stubs below, or delete a variant and point its roles in settings.json at one you keep.",
+  "_worked_examples": "The first two below are filled in to show every optional key in use. The remaining six are deliberately minimal - copy the shape of the first two into whichever ones you want, and delete the keys you do not need. Do NOT keep this file's wording; it is placeholder text, not a starting position.",
+  "_stubs": "Minimal but valid, so nothing crashes before you get to them. Fill in the ones you want; a stub still builds, it just says nothing about you.",
+  "_annotation_keys": "Keys starting with _ are notes for you and carry no meaning to the builder - delete them once you have read them. One exception: build.py iterates `variants` directly, so a _ key placed THERE is read as a variant and crashes the build. Keep variant notes inside a variant object, never beside one.",
+  "meta": {
+    "_note": "{years} and {ai_tools} below are substituted into any variant summary that uses them. density scales line spacing; lower is tighter. Per-variant density overrides this one.",
+    "years_experience": "over 4 years",
+    "ai_tools": "GitHub Copilot and Claude",
+    "font": "Calibri",
+    "font_size_pt": 10,
+    "name_size_pt": 18,
+    "accent": "1F3864",
+    "margin_twips": 850,
+    "density": 0.9
+  },
+  "contact": {
+    "name": "Your Name",
+    "phone": "+00 000 000 000",
+    "email": "you@example.com",
+    "location": "City, Country"
+  },
+  "links": {
+    "_note": "Keyed by id. A variant's `links` array lists the ids it shows, so a design CV can carry a portfolio that a QA CV leaves off.",
+    "linkedin": {
+      "label": "LinkedIn",
+      "url": "https://www.linkedin.com/in/your-handle"
+    },
+    "portfolio": {
+      "label": "Portfolio",
+      "url": "https://example.com/portfolio"
+    },
+    "github": {
+      "label": "GitHub",
+      "url": "https://github.com/your-handle"
+    }
+  },
+  "roles": [
+    {
+      "id": "current_role",
+      "title": "Automation Engineer",
+      "title_overrides": {
+        "data_analyst": "Automation Engineer — Data Focus",
+        "game_data_analyst": "Automation Engineer (Data Focus)"
+      },
+      "org": "Example Consultancy — on behalf of a client",
+      "start": "01/2025",
+      "end": "",
+      "location": "City, Country",
+      "bullets": [
+        {
+          "text": "Build and maintain scheduled automation pipelines that produce structured reports and trigger downstream analysis workflows",
+          "tags": [
+            "automation_qa",
+            "ai_automation",
+            "sdet",
+            "ai_qa",
+            "data_analyst",
+            "game_data_analyst",
+            "qa_gaming",
+            "game_designer"
+          ]
+        },
+        {
+          "text": "Implement and maintain CI/CD pipelines that run the test suite automatically and surface regressions early",
+          "tags": [
+            "automation_qa",
+            "ai_automation",
+            "sdet",
+            "ai_qa",
+            "qa_gaming",
+            "data_analyst",
+            "game_data_analyst",
+            "game_designer"
+          ]
+        },
+        {
+          "text": "Evaluate LLM output for correctness, consistency and edge-case behaviour, recording failure modes for engineering review",
+          "tags": [
+            "ai_qa",
+            "ai_automation",
+            "sdet",
+            "automation_qa",
+            "qa_gaming",
+            "game_designer",
+            "data_analyst",
+            "game_data_analyst"
+          ]
+        },
+        {
+          "text": "Build KPI dashboards for product and engineering stakeholders, defining what gets measured and how",
+          "tags": [
+            "data_analyst",
+            "game_data_analyst",
+            "automation_qa",
+            "ai_automation",
+            "sdet",
+            "ai_qa",
+            "qa_gaming",
+            "game_designer"
+          ]
+        }
+      ],
+      "keywords": {
+        "_note": "Shown under the role as a compact keyword line. `default` is used for any variant without its own list. jobs/tailor.py trims this block to hold the 2-page rule - on tight variants it can trim to nothing, which is expected.",
+        "default": [
+          "Python",
+          "CI/CD",
+          "Test Automation",
+          "REST APIs",
+          "Git"
+        ],
+        "ai_qa": [
+          "Python",
+          "LLM Evaluation",
+          "Prompt Engineering",
+          "CI/CD",
+          "API Testing"
+        ],
+        "data_analyst": [
+          "Python",
+          "SQL",
+          "Dashboards",
+          "Data Modelling",
+          "CI/CD"
+        ]
+      }
+    },
+    {
+      "id": "previous_role",
+      "title": "Quality Assurance Engineer",
+      "org": "Example Engineering",
+      "start": "07/2022",
+      "end": "12/2024",
+      "location": "City, Country",
+      "bullets": [
+        {
+          "text": "Converted product requirements into test concepts with full traceability, then designed and executed the detailed test cases against them",
+          "tags": [
+            "automation_qa",
+            "ai_automation",
+            "sdet",
+            "ai_qa",
+            "qa_gaming",
+            "data_analyst",
+            "game_data_analyst",
+            "game_designer"
+          ]
+        },
+        {
+          "text": "Ran defect triage end to end: pre-analysis from logs and traces, routing, root-cause investigation and regression validation",
+          "tags": [
+            "automation_qa",
+            "ai_automation",
+            "sdet",
+            "ai_qa",
+            "qa_gaming",
+            "data_analyst",
+            "game_data_analyst",
+            "game_designer"
+          ]
+        },
+        {
+          "text": "Performed API testing and integration validation across services",
+          "tags": [
+            "sdet",
+            "ai_qa",
+            "automation_qa",
+            "ai_automation",
+            "qa_gaming",
+            "data_analyst",
+            "game_data_analyst",
+            "game_designer"
+          ]
+        }
+      ],
+      "keywords": {
+        "default": [
+          "Test Design",
+          "Defect Management",
+          "API Testing",
+          "Regression Testing",
+          "ISTQB"
+        ]
+      }
+    }
+  ],
+  "creative": [
+    {
+      "_note": "Personal or side projects. Same shape as a role, plus an optional `link`. Referenced by the `creative` array on the variants that show them.",
+      "id": "side_project",
+      "title": "Example Project — A Small Game",
+      "org": "Independent Project",
+      "start": "03/2024",
+      "end": "Ongoing",
+      "location": "",
+      "link": "portfolio",
+      "bullets": [
+        {
+          "text": "Designed and shipped a small game end to end, iterating the core loop against playtest feedback",
+          "tags": [
+            "game_designer",
+            "qa_gaming",
+            "game_data_analyst"
+          ]
+        },
+        {
+          "text": "Instrumented the build to capture play telemetry, then used it to rebalance progression",
+          "tags": [
+            "game_designer",
+            "qa_gaming",
+            "game_data_analyst",
+            "data_analyst"
+          ]
+        }
+      ],
+      "keywords": {
+        "default": [
+          "Game Design",
+          "Playtesting",
+          "Telemetry",
+          "Balancing"
+        ]
+      }
+    },
+    {
+      "id": "community",
+      "title": "Volunteer — Local Games Community",
+      "org": "Community Organisation",
+      "start": "2023",
+      "end": "2024",
+      "location": "",
+      "bullets": [
+        {
+          "text": "Helped run community events and wrote coverage of local releases",
+          "tags": [
+            "game_designer",
+            "qa_gaming",
+            "game_data_analyst"
+          ]
+        }
+      ],
+      "keywords": {
+        "default": [
+          "Community",
+          "Events",
+          "Writing"
+        ]
+      }
+    }
+  ],
+  "skill_groups": {
+    "_note": "Keyed by id; a variant lists the ids it wants, in the order it wants them.",
+    "qa_test": {
+      "title": "QA & Test Engineering",
+      "items": [
+        "End-to-end test lifecycle: requirements analysis, test concept design, case implementation and execution",
+        "Test automation scripting and framework maintenance",
+        "Defect lifecycle management: triage, root-cause investigation, regression validation",
+        "CI/CD pipeline design and maintenance"
+      ]
+    },
+    "ai_llm": {
+      "title": "AI & LLM Testing",
+      "items": [
+        "Evaluation of model output for correctness, consistency and failure modes",
+        "Prompt engineering for scripting, debugging and documentation",
+        "Structured acceptance criteria for non-deterministic systems"
+      ]
+    },
+    "automation": {
+      "title": "Automation & Workflow",
+      "items": [
+        "Scheduled workflow pipelines with API integrations",
+        "CI/CD implementation and maintenance",
+        "Test automation scripting and framework development"
+      ]
+    },
+    "prog_data": {
+      "title": "Programming & Data",
+      "items": [
+        "Python — scripting, automation, data processing and reporting",
+        "SQL — querying and modelling",
+        "Dashboard development and data visualisation",
+        "Git — version control, branching, code review"
+      ]
+    },
+    "game": {
+      "title": "Game Design & Analytics",
+      "items": [
+        "Core loop and progression design, iterated against playtest feedback",
+        "Play telemetry: instrumentation, funnels and retention basics",
+        "Familiarity with common engines and prototyping tools"
+      ]
+    },
+    "tools": {
+      "title": "Tools",
+      "items": [
+        "Jira",
+        "Git",
+        "Jenkins",
+        "VS Code"
+      ]
+    },
+    "soft": {
+      "title": "Working Style",
+      "items": [
+        "Clear written communication with technical and non-technical audiences",
+        "Comfortable raising quality concerns early and constructively"
+      ]
+    }
+  },
+  "education": [
+    {
+      "degree": "Your Degree",
+      "school": "Your University",
+      "start": "2018",
+      "end": "2021"
+    }
+  ],
+  "certifications": [
+    "ISTQB Foundation Level — Credential ID 000000 (01/2023)"
+  ],
+  "languages": "Language A: Native  |  Language B: Fluent  |  Language C: Beginner",
+  "variants": {
+    "automation_qa": {
+      "filename": "Your_Name_CV",
+      "folder": "QA and Automation",
+      "density": 0.8,
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin",
+        "github"
+      ],
+      "summary": "One paragraph. {years} and {ai_tools} are substituted from meta. Write your own - this sentence is a placeholder.",
+      "skill_groups": [
+        "automation",
+        "prog_data",
+        "qa_test",
+        "tools"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    },
+    "game_designer": {
+      "_note": "Second worked example, showing the optional keys: creative-first ordering, merged role blocks, and dropping keyword lines and certificates to buy space. Use these only if they suit you.",
+      "filename": "Your_Name_CV",
+      "folder": "Game Design",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin",
+        "portfolio"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "game",
+        "soft"
+      ],
+      "creative_title": "Projects",
+      "creative": [
+        "side_project"
+      ],
+      "experience_title": "Professional Experience",
+      "roles": [
+        "current_role",
+        "previous_role"
+      ],
+      "merge_roles": [
+        {
+          "_note": "OPTIONAL. Collapses several role ids into one dated block - useful when one employer covered several titles. Delete this key entirely if you do not need it.",
+          "id": "example_merged",
+          "ids": [
+            "current_role",
+            "previous_role"
+          ],
+          "title": "Combined Title / Other Title",
+          "org": "Employer A & Employer B"
+        }
+      ],
+      "show_keywords": false,
+      "show_certifications": false,
+      "community_title": "Community Involvement",
+      "community": [
+        "community"
+      ]
+    },
+    "sdet": {
+      "filename": "Your_Name_CV",
+      "folder": "SDET",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "qa_test",
+        "prog_data"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    },
+    "ai_qa": {
+      "filename": "Your_Name_CV",
+      "folder": "AI QA",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "ai_llm",
+        "qa_test"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    },
+    "ai_automation": {
+      "filename": "Your_Name_CV",
+      "folder": "AI Automation",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "automation",
+        "ai_llm"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    },
+    "data_analyst": {
+      "filename": "Your_Name_CV",
+      "folder": "Data Analysis",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "prog_data",
+        "tools"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    },
+    "game_data_analyst": {
+      "filename": "Your_Name_CV",
+      "folder": "Game Data",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin",
+        "portfolio"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "prog_data",
+        "game"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    },
+    "qa_gaming": {
+      "filename": "Your_Name_CV",
+      "folder": "QA Gaming",
+      "headline": "YOUR HEADLINE HERE",
+      "links": [
+        "linkedin",
+        "portfolio"
+      ],
+      "summary": "Write your own.",
+      "skill_groups": [
+        "qa_test",
+        "game"
+      ],
+      "roles": [
+        "current_role",
+        "previous_role"
+      ]
+    }
+  }
+}

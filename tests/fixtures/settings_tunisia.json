@@ -1,0 +1,637 @@
+{
+  "_comment": "Regression fixture. The search score.py hard-coded before settings existed: a QA/AI engineer leaving Tunisia, relocating to named European and Gulf cities, applying for game design at entry level only. tests/test_score.py pins its behaviour against this file, so every refactor of the scorer has to keep this persona's rankings intact.",
+  "you": {
+    "home_country": "Tunisia",
+    "home_places": [
+      "tunis",
+      "tunisia",
+      "tunisie",
+      "sfax",
+      "sousse"
+    ],
+    "authorized_countries": [
+      "Tunisia"
+    ],
+    "regions": [
+      "africa",
+      "north africa",
+      "mena",
+      "middle east",
+      "emea"
+    ],
+    "utc_offset": 1,
+    "years_experience": 5,
+    "needs_visa_sponsorship": true
+  },
+  "location": {
+    "on_site_at_home": "reject",
+    "max_timezone_gap_hours": 3,
+    "preferred_regions": [
+      "emea",
+      "europe",
+      "european",
+      "eu remote",
+      "cet",
+      "central european"
+    ],
+    "relocation_targets": [
+      {
+        "country": "Netherlands",
+        "places": [
+          "netherlands",
+          "holland",
+          "dutch",
+          "amsterdam",
+          "rotterdam",
+          "utrecht",
+          "the hague",
+          "den haag",
+          "eindhoven",
+          "groningen",
+          "delft",
+          "haarlem"
+        ]
+      },
+      {
+        "country": "Germany",
+        "places": [
+          "berlin",
+          "hamburg"
+        ]
+      },
+      {
+        "country": "Finland",
+        "places": [
+          "finland",
+          "finnish",
+          "helsinki",
+          "oulu",
+          "tampere",
+          "espoo",
+          "vantaa",
+          "turku"
+        ]
+      },
+      {
+        "country": "Denmark",
+        "places": [
+          "denmark",
+          "danmark",
+          "copenhagen",
+          "københavn",
+          "aarhus",
+          "århus",
+          "odense",
+          "aalborg",
+          "ålborg"
+        ]
+      },
+      {
+        "country": "France",
+        "places": [
+          "paris"
+        ]
+      },
+      {
+        "country": "Spain",
+        "places": [
+          "madrid",
+          "andalusia",
+          "andalucía",
+          "málaga",
+          "malaga",
+          "seville",
+          "sevilla",
+          "granada",
+          "cádiz",
+          "cadiz",
+          "córdoba",
+          "cordoba",
+          "marbella"
+        ]
+      },
+      {
+        "country": "Saudi Arabia",
+        "places": [
+          "saudi",
+          "ksa",
+          "riyadh",
+          "jeddah",
+          "dammam",
+          "khobar",
+          "dhahran",
+          "neom"
+        ]
+      },
+      {
+        "country": "United Arab Emirates",
+        "places": [
+          "uae",
+          "united arab emirates",
+          "dubai",
+          "abu dhabi",
+          "sharjah"
+        ]
+      },
+      {
+        "country": "Qatar",
+        "places": [
+          "qatar",
+          "doha"
+        ]
+      },
+      {
+        "country": "Kuwait",
+        "places": [
+          "kuwait"
+        ]
+      },
+      {
+        "country": "Bahrain",
+        "places": [
+          "bahrain",
+          "manama"
+        ]
+      },
+      {
+        "country": "Oman",
+        "places": [
+          "oman",
+          "muscat"
+        ]
+      }
+    ],
+    "accept_country_locks": [
+      "Vietnam",
+      "Laos",
+      "Cambodia",
+      "Thailand",
+      "Indonesia",
+      "Malaysia",
+      "Singapore",
+      "Myanmar",
+      "Brunei",
+      "Timor-Leste",
+      "Southeast Asia",
+      "South East Asia",
+      "SEA",
+      "ASEAN",
+      "South Africa"
+    ]
+  },
+  "roles": [
+    {
+      "name": "game_design",
+      "titles": [
+        "re:\\b(game|level|narrative|gameplay|systems|combat|encounter|quest|economy)\\s*design(er)?s?\\b"
+      ],
+      "cv": "game_designer",
+      "points": 16,
+      "reason": "game-role",
+      "interest": "gaming",
+      "max_level": "junior",
+      "above_level": "reject",
+      "internships": true,
+      "junior_bonus": 14,
+      "allow_excluded": [
+        "devops",
+        "sre",
+        "site reliability",
+        "platform engineer",
+        "infrastructure engineer",
+        "principal",
+        "staff"
+      ]
+    },
+    {
+      "name": "game_data",
+      "titles": [
+        "re:\\b(game analyst|player analytics|game data)\\b"
+      ],
+      "cv": "game_data_analyst",
+      "points": 16,
+      "reason": "game-role",
+      "interest": "gaming",
+      "max_level": "senior",
+      "internships": true,
+      "allow_excluded": [
+        "devops",
+        "sre",
+        "site reliability",
+        "platform engineer",
+        "infrastructure engineer",
+        "principal",
+        "staff"
+      ]
+    },
+    {
+      "name": "ai_qa",
+      "titles": [
+        "re:\\b(ai qa|ai quality|ai test|ai evaluat\\w*|llm eval\\w*|model eval\\w*|evaluat\\w*\\s+(?:engineer|specialist|analyst|lead)|prompt engineer|ai trainer|ai annotat\\w*|red team\\w*|evals?|ai automation|ai[- ]?ops|llm automation|(?:gen(?:erative )?)?ai specialist)\\b"
+      ],
+      "not_titles": [
+        "re:\\b(?:full[- ]?stack|back[- ]?end|front[- ]?end|software|platform|infrastructure|research|systems)\\s+(?:engineer|developer)\\b|\\bmember of technical staff\\b"
+      ],
+      "not_titles_unless": [
+        "qa"
+      ],
+      "cv": "ai_qa",
+      "cv_rules": [
+        {
+          "title": [
+            "re:\\b(?:ai|llm|genai|generative ai|agentic)[\\s-]*(?:automation|ops|workflow|specialist)"
+          ],
+          "cv": "ai_automation"
+        }
+      ],
+      "points": 62,
+      "reason": "AI-QA-role",
+      "interest": "AI",
+      "max_level": "senior",
+      "internships": "gaming"
+    },
+    {
+      "name": "qa",
+      "titles": [
+        "re:\\b(qa|quality assurance|quality engineer|test engineer|tester|test analyst|test automation|sdet|software engineer in test|automation engineer|automation specialist|test specialist|quality analyst)\\b"
+      ],
+      "cv": "automation_qa",
+      "cv_rules": [
+        {
+          "interest": "gaming",
+          "cv": "qa_gaming"
+        },
+        {
+          "title": [
+            "agentic",
+            "ai agent*",
+            "llm*",
+            "large language model*",
+            "genai",
+            "generative ai",
+            "prompt*",
+            "rag",
+            "model evaluation",
+            "llmops",
+            "foundation model*",
+            "copilot"
+          ],
+          "cv": "ai_qa"
+        },
+        {
+          "title": [
+            "sdet",
+            "software engineer in test"
+          ],
+          "cv": "sdet"
+        },
+        {
+          "text": [
+            "re:\\b(automotive|vehicle|car maker|carmaker|adas|autosar|aspice|canoe|canalyzer|hil\\b|ecu\\b|ecus\\b|infotainment|powertrain|telematics|mobility|autonomous driv\\w*)\\b|\\b(cariad|bmw|volkswagen|audi|porsche|mercedes|daimler|bosch|conti(?:nental)?|zf\\b|valeo|stellantis|rivian|lucid motors|moia|kpit)\\b"
+          ],
+          "cv": "automation_qa_automotive"
+        }
+      ],
+      "points": 30,
+      "reason": "QA-title",
+      "max_level": "senior",
+      "internships": "gaming",
+      "allow_excluded": [
+        "devops",
+        "sre",
+        "site reliability",
+        "platform engineer",
+        "infrastructure engineer",
+        "principal",
+        "staff"
+      ]
+    },
+    {
+      "name": "data",
+      "titles": [
+        "re:\\b(data analyst|analytics engineer|business intelligence|bi analyst|reporting analyst|insights analyst|product analyst)\\b"
+      ],
+      "cv": "data_analyst",
+      "cv_rules": [
+        {
+          "interest": "gaming",
+          "cv": "game_data_analyst"
+        }
+      ],
+      "points": -15,
+      "reason": "data-role(least preferred)",
+      "waive_if_interest": "gaming",
+      "max_level": "senior",
+      "internships": "gaming"
+    },
+    {
+      "name": "automation",
+      "titles": [
+        "workflow automation",
+        "automation developer",
+        "rpa"
+      ],
+      "cv": "automation_qa",
+      "max_level": "senior",
+      "internships": "gaming"
+    }
+  ],
+  "exclude_titles": [
+    "re:\\b(copywriter|content writer|accountant|paralegal|nurse|driver|teacher|tutor|machine learning engineer|ml engineer|research scientist|data scientist|deep learning|computer vision engineer|nlp engineer|security engineer|penetration|devops|sre|site reliability|platform engineer|infrastructure engineer|network engineer|systems administrator|cloud architect|graphic designer|ux designer|ui designer|product designer|visual designer|brand designer|motion designer|illustrator|3d artist|technical artist|engineering manager|product manager|program manager|project manager|research engineer|research scientist|scientist|solutions architect|technical account|support engineer|technical writer|principal|staff|director|head of|chief|vp of|vp,)\\b"
+  ],
+  "exclude_departments": [
+    "re:\\b(sales|account executive|account manager|customer success|business development|recruit\\w*|talent acquisition|marketing|seo|social media|finance|payroll|legal)\\b"
+  ],
+  "interests": [
+    {
+      "name": "AI",
+      "terms": [
+        "agentic",
+        "ai agent*",
+        "llm*",
+        "large language model*",
+        "genai",
+        "generative ai",
+        "prompt*",
+        "rag",
+        "model evaluation",
+        "llmops",
+        "foundation model*",
+        "copilot"
+      ],
+      "title_points": 35,
+      "text_points": 12
+    },
+    {
+      "name": "gaming",
+      "terms": [
+        "game",
+        "gaming",
+        "gameplay",
+        "unity",
+        "unreal",
+        "game studio",
+        "valorant",
+        "league of legends",
+        "wild rift",
+        "teamfight",
+        "fortnite",
+        "minecraft",
+        "roblox",
+        "call of duty",
+        "overwatch",
+        "hearthstone",
+        "apex legends",
+        "counter-strike",
+        "counterstrike",
+        "dota"
+      ],
+      "companies": [
+        "re:riot|epic ?games|ubisoft|blizzard|electronic arts|activision|bethesda|rockstar|naughty dog|bungie|valve|zynga|supercell|rovio|king\\.com|miniclip|gameloft|nintendo|playstation|xbox|sega|capcom|square enix|bandai|netease games|wargaming|paradox|cd projekt|larian|embracer|jagex|colonist|\\bgames\\b|game studio|interactive entertainment"
+      ],
+      "title_points": 12,
+      "text_points": 12
+    }
+  ],
+  "description_bonus": [
+    {
+      "terms": [
+        "python"
+      ],
+      "points": 6
+    },
+    {
+      "terms": [
+        "jenkins",
+        "ci/cd",
+        "automation",
+        "pytest",
+        "selenium"
+      ],
+      "points": 6
+    }
+  ],
+  "search_queries": [
+    "qa engineer",
+    "quality assurance",
+    "test automation",
+    "sdet"
+  ],
+  "scoring": {
+    "min_score": 45,
+    "max_per_company": 3
+  },
+  "tailoring": {
+    "skills": {
+      "Python": [
+        "re:\\bpython\\b"
+      ],
+      "C#": [
+        "re:\\bc#|\\bc-sharp\\b"
+      ],
+      "KQL": [
+        "re:\\bkql\\b|kusto"
+      ],
+      "SQL": [
+        "re:\\bsql\\b"
+      ],
+      "Azure Data Explorer": [
+        "re:azure data explorer|\\badx\\b"
+      ],
+      "Azure": [
+        "re:\\bazure\\b"
+      ],
+      "Jenkins": [
+        "re:\\bjenkins\\b"
+      ],
+      "Playwright": [
+        "re:playwright"
+      ],
+      "CI/CD": [
+        "re:ci/cd|continuous integration|continuous delivery"
+      ],
+      "Groovy": [
+        "re:\\bgroovy\\b"
+      ],
+      "n8n": [
+        "re:\\bn8n\\b"
+      ],
+      "Workflow automation": [
+        "re:workflow automation|process automation"
+      ],
+      "Git": [
+        "re:\\bgit\\b|version control"
+      ],
+      "Jira": [
+        "re:\\bjira\\b"
+      ],
+      "Confluence": [
+        "re:\\bconfluence\\b"
+      ],
+      "Adobe InDesign": [
+        "re:indesign"
+      ],
+      "REST APIs": [
+        "re:\\brest\\b|restful|\\bapi\\b"
+      ],
+      "API testing": [
+        "re:api testing|api test|integration testing"
+      ],
+      "Test automation": [
+        "re:test automation|automated test|automation framework"
+      ],
+      "Test design": [
+        "re:test design|test case|test plan|test strateg"
+      ],
+      "Regression testing": [
+        "re:regression"
+      ],
+      "Defect management": [
+        "re:defect|bug tracking|triage"
+      ],
+      "Root-cause analysis": [
+        "re:root cause|rca\\b"
+      ],
+      "Requirements analysis": [
+        "re:requirement"
+      ],
+      "Requirements traceability": [
+        "re:traceab"
+      ],
+      "ISTQB": [
+        "re:\\bistqb\\b"
+      ],
+      "Agile / Scrum": [
+        "re:\\bagile\\b|\\bscrum\\b|\\bkanban\\b"
+      ],
+      "BDD": [
+        "re:\\bbdd\\b|behaviour driven|behavior driven|gherkin|cucumber"
+      ],
+      "Prompt engineering": [
+        "re:prompt engineer|prompting|prompt design"
+      ],
+      "LLM evaluation": [
+        "re:llm eval|model eval|evals?\\b|output quality|hallucinat"
+      ],
+      "Agentic AI": [
+        "re:agentic|ai agent|multi-agent"
+      ],
+      "GitHub Copilot": [
+        "re:copilot"
+      ],
+      "LLMs": [
+        "re:\\bllm\\b|large language model|\\bgpt\\b|\\bclaude\\b|generative ai|\\bgenai\\b"
+      ],
+      "Dashboards": [
+        "re:dashboard"
+      ],
+      "Data visualization": [
+        "re:data visuali[sz]ation|visuali[sz]ation"
+      ],
+      "Data analysis": [
+        "re:data analysis|data analytics|analytics"
+      ],
+      "A/B testing": [
+        "re:a/b test|split test|experimentation"
+      ],
+      "Cohort analysis": [
+        "re:cohort"
+      ],
+      "KPI reporting": [
+        "re:\\bkpi\\b|metrics reporting"
+      ],
+      "Wireshark": [
+        "re:wireshark"
+      ],
+      "AUTOSAR": [
+        "re:autosar"
+      ],
+      "Embedded systems": [
+        "re:embedded"
+      ],
+      "Linux": [
+        "re:\\blinux\\b|\\bunix\\b"
+      ],
+      "SLA tracking": [
+        "re:\\bslas?\\b|service level"
+      ],
+      "Process improvement": [
+        "re:process improvement|continuous improvement|process gaps"
+      ],
+      "Cross-functional coordination": [
+        "re:cross[- ]functional|coordinat(?:e|es|ion|ing)\\b"
+      ],
+      "Quality assurance": [
+        "re:quality[- ]assurance|\\bqa\\b"
+      ],
+      "Written communication": [
+        "re:written communication|technical writing|report writing"
+      ],
+      "Attention to detail": [
+        "re:attention to detail|detail[- ]oriented|eye for detail"
+      ],
+      "English (bilingual)": [
+        "re:\\benglish\\b"
+      ],
+      "French (bilingual)": [
+        "re:\\bfrench\\b|fran[cç]ais"
+      ],
+      "Arabic (native)": [
+        "re:\\barabic\\b"
+      ]
+    },
+    "gaps": {
+      "Postgres / MySQL / Snowflake": [
+        "re:postgres|mysql|snowflake|bigquery"
+      ],
+      "Tableau / Power BI": [
+        "re:tableau|power ?bi|looker"
+      ],
+      "Unity": [
+        "re:\\bunity\\b"
+      ],
+      "Unreal": [
+        "re:unreal"
+      ],
+      "Selenium": [
+        "re:selenium"
+      ],
+      "Cypress": [
+        "re:cypress"
+      ],
+      "Java": [
+        "re:\\bjava\\b(?!script)"
+      ],
+      "JavaScript / TypeScript": [
+        "re:javascript|typescript|\\breact\\b|\\bnode\\b"
+      ],
+      "Docker / Kubernetes": [
+        "re:docker|kubernetes|\\bk8s\\b"
+      ],
+      "AWS / GCP": [
+        "re:\\baws\\b|\\bgcp\\b|amazon web services|google cloud"
+      ],
+      "Machine learning": [
+        "re:machine learning|deep learning|pytorch|tensorflow|scikit"
+      ],
+      "LangChain / agent frameworks": [
+        "re:langchain|llamaindex|autogen|crewai"
+      ],
+      "Terraform": [
+        "re:terraform"
+      ],
+      "German (fluent)": [
+        "re:\\bgerman\\b|deutsch"
+      ]
+    },
+    "weak": [
+      "Arabic (native)",
+      "Attention to detail",
+      "Azure",
+      "English (bilingual)",
+      "French (bilingual)",
+      "Git",
+      "Written communication"
+    ]
+  }
+}

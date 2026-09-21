@@ -1,0 +1,338 @@
+"""Find Ashby job boards beyond targets.json, and prune the ones not worth polling.
+
+    python -m jobs.discover               # crawl -> probe every board -> ashby_boards.json
+    python -m jobs.discover --indexes 1   # read only the newest crawl (faster, fewer boards)
+    python -m jobs.discover --list        # what the scrape polls, and what is pruned and why
+
+Ashby has no search across companies: a board can only be read by someone who already
+knows its token. Common Crawl's public URL index records every jobs.ashbyhq.com/<token>
+page it crawled - about 2,000 companies across three monthly crawls on 2026-09-17, against
+25 hand-picked in targets.json. It is not all of Ashby. VA4U's board, whose AI Specialist
+started this, was in none of them - so `jobs.paste` is still the way in for the rest.
+
+Run it weekly - the SessionStart hook in .claude/settings.local.json does, via `--if-due`,
+logging to jobs/discover.log; `/discover` runs it by hand. It re-probes every board it
+knows, pruned ones included, so a board that starts hiring again comes back. The daily
+scrape keeps the freshness fields current in between.
+
+Pruning rules (2026-09-17), applied to curated and discovered boards alike:
+
+  * no new posting in STALE_DAYS - an empty board, or one whose newest job is older
+  * rejected by that company more than once, counted from jobtrack
+
+Every `rejected` entry counts, including the ones jobtrack aged out after weeks with no
+reply: they were confirmed as real rejections (Voodoo, 2026-09-17), not guesses.
+
+Pruning skips a board; it never edits targets.json, so the curation notes there survive.
+"""
+
+from __future__ import annotations
+
+import argparse
+import concurrent.futures as cf
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+from collections import Counter
+from datetime import date, timedelta
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from jobs import sources  # noqa: E402
+
+HERE = Path(__file__).resolve().parent
+STATE_PATH = HERE / "ashby_boards.json"
+LOCK_PATH = HERE / ".discover.lock"
+STALE_DAYS = 30
+MAX_REJECTIONS = 1  # more than this many rejections prunes the company
+CRAWL_INFO = "https://index.commoncrawl.org/collinfo.json"
+ASHBY_URL = re.compile(r"^https?://jobs\.ashbyhq\.com/([^/?#]+)", re.I)
+TOKEN_OK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,79}$")
+# Paths on jobs.ashbyhq.com that are not company boards.
+NOT_BOARDS = {"api", "static", "assets", "favicon.ico", "robots.txt", "sitemap.xml"}
+
+
+# --------------------------------------------------------------------- crawl
+
+
+def token_from_url(url: str) -> str | None:
+    m = ASHBY_URL.match(url.strip())
+    if not m:
+        return None
+    token = urllib.parse.unquote(m.group(1)).strip()
+    if token.lower() in NOT_BOARDS or not TOKEN_OK.match(token):
+        return None
+    return token
+
+
+def _get(url: str, attempts: int = 5) -> bytes:
+    """Common Crawl's index answers 502/503 under load; it is worth waiting out."""
+    last: Exception | None = None
+    for n in range(attempts):
+        try:
+            return sources._read(url, accept="*/*")
+        except Exception as exc:  # noqa: BLE001 - 502s, resets and truncations alike
+            last = exc
+            time.sleep(2 + 3 * n)
+    raise last if last else RuntimeError(url)
+
+
+def crawl_indexes(count: int) -> list[str]:
+    return [c["id"] for c in json.loads(_get(CRAWL_INFO))[:count]]
+
+
+def crawl_tokens(index: str) -> set[str]:
+    base = f"https://index.commoncrawl.org/{index}-index?url=jobs.ashbyhq.com/*&output=json&fl=url"
+    pages = json.loads(_get(base + "&showNumPages=true")).get("pages", 1)
+    found: set[str] = set()
+    for page in range(pages):
+        for line in _get(f"{base}&page={page}").decode("utf-8", "replace").splitlines():
+            try:
+                token = token_from_url(json.loads(line)["url"])
+            except (ValueError, KeyError):
+                continue
+            if token:
+                found.add(token)
+    return found
+
+
+def dedupe_tokens(*groups) -> list[str]:
+    """Ashby tokens are case-insensitive; keep the first spelling seen, curated first."""
+    out: dict[str, str] = {}
+    for group in groups:
+        for token in group:
+            out.setdefault(token.lower(), token)
+    return list(out.values())
+
+
+# --------------------------------------------------------------------- state
+
+
+def load_state(path: Path = STATE_PATH) -> dict:
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    state.setdefault("boards", {})
+    return state
+
+
+def save_state(state: dict, path: Path = STATE_PATH) -> None:
+    """Temp file then replace, as jobtrack's Store does - a killed run must not truncate."""
+    state["_comment"] = (
+        "Generated by `python -m jobs.discover` and refreshed by every scrape. "
+        "Safe to delete: the next discover run rebuilds it."
+    )
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=1, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def record(state: dict, token: str, postings: list[sources.Posting], today: date) -> None:
+    """Note one successful read of a board."""
+    entry = state["boards"].setdefault(token, {"first_seen": today.isoformat()})
+    entry["last_checked"] = today.isoformat()
+    entry["postings"] = len(postings)
+    entry.pop("gone", None)
+    newest = max((p.posted_at for p in postings if p.posted_at), default="")
+    if newest > entry.get("last_new_job", ""):
+        entry["last_new_job"] = newest
+
+
+def record_gone(state: dict, token: str, today: date) -> None:
+    entry = state["boards"].setdefault(token, {"first_seen": today.isoformat()})
+    entry["last_checked"] = today.isoformat()
+    entry["gone"] = True
+
+
+# ------------------------------------------------------------------- pruning
+
+
+def _norm(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
+def rejections(applications) -> Counter:
+    """Rejections per normalised company name - aged-out ones included, they are real."""
+    counts: Counter = Counter()
+    for app in applications:
+        status = app["status"] if isinstance(app, dict) else app.status
+        if status != "rejected":
+            continue
+        company = app["company"] if isinstance(app, dict) else app.company
+        counts[_norm(company)] += 1
+    return counts
+
+
+def prune_reason(token: str, entry: dict | None, rejections: Counter, today: date) -> str:
+    """Why a board should be skipped, or "" to poll it."""
+    rejected = max(rejections[_norm(token)], rejections[_norm(sources.pretty_company(token))])
+    if rejected > MAX_REJECTIONS:
+        return f"rejected {rejected} times"
+    if entry is None:
+        return ""  # never read - a board just added to targets.json gets its first look
+    if entry.get("gone"):
+        return "board no longer exists"
+    newest = entry.get("last_new_job", "")
+    if not newest:
+        return "no postings"
+    if newest < (today - timedelta(days=STALE_DAYS)).isoformat():
+        return f"no new job since {newest}"
+    return ""
+
+
+def ashby_plan(
+    curated: list[str], state: dict, rejections: Counter, today: date
+) -> tuple[list[str], dict[str, str]]:
+    """(tokens to poll, {pruned token: reason}) over curated + discovered boards."""
+    poll: list[str] = []
+    pruned: dict[str, str] = {}
+    boards = state.get("boards", {})
+    by_lower = {t.lower(): t for t in boards}
+    for token in dedupe_tokens(curated, boards):
+        why = prune_reason(token, boards.get(by_lower.get(token.lower(), token)), rejections, today)
+        if why:
+            pruned[token] = why
+        else:
+            poll.append(token)
+    return poll, pruned
+
+
+def load_rejections(store_path: Path | None = None) -> Counter:
+    from jobtrack.storage import Store, default_path
+
+    return rejections(Store(store_path or default_path()))
+
+
+# ---------------------------------------------------------------------- main
+
+
+def probe(tokens: list[str], state: dict, today: date, workers: int = 16) -> Counter:
+    tally: Counter = Counter()
+
+    def one(token: str):
+        try:
+            return token, sources.ashby(token), None
+        except urllib.error.HTTPError as exc:
+            return token, None, exc
+        except Exception as exc:  # noqa: BLE001 - a flaky board must not stop the sweep
+            return token, None, exc
+
+    with cf.ThreadPoolExecutor(max_workers=workers) as pool:
+        for token, postings, exc in pool.map(one, tokens):
+            if postings is not None:
+                record(state, token, postings, today)
+                tally["live" if postings else "empty"] += 1
+            elif isinstance(exc, urllib.error.HTTPError) and exc.code == 404:
+                record_gone(state, token, today)
+                tally["gone"] += 1
+            else:
+                tally["failed"] += 1  # left untouched: a timeout says nothing about the board
+    return tally
+
+
+def last_monday(today: date) -> date:
+    return today - timedelta(days=today.weekday())
+
+
+def is_due(state: dict, today: date) -> bool:
+    """Weekly, anchored to Monday: a week with no Monday session catches up on the next one."""
+    return state.get("last_discovery", "") < last_monday(today).isoformat()
+
+
+def merge_boards(fresh: dict, ours: dict) -> dict:
+    """`fresh` re-read from disk just before saving, `ours` this run's probe results.
+
+    A daily scrape can save the file while a sweep is still running; writing `ours` over
+    it wholesale would erase that scrape's freshness updates, and the scrape's own save
+    would erase a whole week's discovery the other way round.
+    """
+    fresh.setdefault("boards", {}).update(ours.get("boards", {}))
+    for key, value in ours.items():
+        if key != "boards":
+            fresh[key] = value
+    return fresh
+
+
+def _take_lock(path: Path, stale_after: timedelta = timedelta(hours=2)) -> bool:
+    """One sweep at a time: two chats opened on a Monday must not both start one."""
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        age = time.time() - path.stat().st_mtime
+        if age < stale_after.total_seconds():
+            return False
+        path.unlink(missing_ok=True)  # left by a killed run
+        return _take_lock(path, stale_after)
+    os.close(fd)
+    return True
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--indexes", type=int, default=3, help="how many monthly crawls to read")
+    ap.add_argument("--list", action="store_true", help="show the poll/prune plan and exit")
+    ap.add_argument(
+        "--if-due",
+        action="store_true",
+        help="do nothing unless no sweep has run since this week's Monday (the session hook)",
+    )
+    ap.add_argument("--file", type=Path, default=None, help="jobtrack data file")
+    args = ap.parse_args(argv)
+
+    targets = json.loads((HERE / "targets.json").read_text(encoding="utf-8"))
+    curated = targets.get("ashby", [])
+    state = load_state()
+    today = date.today()
+
+    if args.if_due and not args.list:
+        if not is_due(state, today):
+            print(f"{today}: not due - last sweep {state.get('last_discovery')}")
+            return 0
+        if not _take_lock(LOCK_PATH):
+            print(f"{today}: a sweep is already running")
+            return 0
+        print(f"{today}: weekly sweep starting")
+
+    if not args.list:
+        found: set[str] = set()
+        for index in crawl_indexes(args.indexes):
+            try:
+                got = crawl_tokens(index)
+            except Exception as exc:  # noqa: BLE001 - one bad crawl keeps the others
+                print(f"  {index}: unavailable ({type(exc).__name__})")
+                continue
+            print(f"  {index}: {len(got)} board tokens")
+            found |= got
+        tokens = dedupe_tokens(curated, state["boards"], sorted(found))
+        print(f"Probing {len(tokens)} Ashby boards...")
+        try:
+            tally = probe(tokens, state, today)
+            state["last_discovery"] = today.isoformat()
+            state = merge_boards(load_state(), state)
+            save_state(state)
+        finally:
+            LOCK_PATH.unlink(missing_ok=True)
+        print("  " + ", ".join(f"{n} {k}" for k, n in tally.most_common()))
+
+    poll, pruned = ashby_plan(curated, state, load_rejections(args.file), today)
+    print(f"\nThe scrape will poll {len(poll)} Ashby boards; {len(pruned)} pruned.")
+    reasons = Counter(re.sub(r"\d{4}-\d{2}-\d{2}|\d+", "N", r) for r in pruned.values())
+    for why, n in reasons.most_common():
+        print(f"  {n:>5}  {why}")
+    if args.list:
+        for token, why in sorted(pruned.items()):
+            if token in curated or why.startswith("rejected"):
+                print(f"  - {token}: {why}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

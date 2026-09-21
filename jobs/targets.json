@@ -1,0 +1,65 @@
+{
+  "_comment": "Company ATS boards to poll. Add/remove freely - each is a public JSON endpoint. Note: every value in the arrays below is fetched as a board token, so keep annotations in these top-level _* keys, never inside an array.",
+
+  "_verified": "All entries probed live 2026-08-04. Removed: lever:voiceflow, lever:netlify, ashby:perplexityai, ashby:runwayml (all 404). OpenAI is NOT dead - it moved off Greenhouse onto Ashby, where it is now the single largest board here.",
+  "_empty_but_live": "lever:mistral, lever:wealthsimple and ashby:vercel return 200 with zero openings. Kept - the endpoint is valid, they just aren't hiring today.",
+  "_lever_was_broken": "Until 2026-08-06 every Lever board with at least one posting fetched empty: Lever's createdAt is in milliseconds and sources._iso read it as seconds, raising OSError. It went unnoticed because all three Lever tokens here are empty, so the crash never fired. Fixed in _iso, pinned by tests/test_sources.py. If a Lever board ever reports 0 again, check that it is really empty.",
+  "_was_flaky_fixed_2026_09_09": "HISTORICAL. greenhouse:databricks, greenhouse:elastic, greenhouse:canonical and ashby:openai used to truncate mid-string, and on 2026-09-09 six boards failed in one scrape (anthropic, openai, scaleai, notion, elastic, harvey). Root cause was NOT the boards: sources._read sent `Accept-Encoding: identity`, so the largest tenants streamed 7-13 MB uncompressed and dropped 0.6-2 MB short every time. It now asks for gzip and inflates via sources._inflate - same bodies are 8-12x smaller and arrive whole on the first try. A JSONDecodeError from these boards is no longer expected; if one reappears, suspect a real board change, not size.",
+  "_removed_2026_09_03": "lever:plaid - confirmed HTTP 404 (not the empty-but-live case above; the endpoint itself is gone). Removed from the lever array.",
+
+  "_global_hiring_rejected_2026_09_09": "Probed 30 EOR/staffing/talent-marketplace names x 3 ATSes (90 pairs) to reach US companies hiring abroad on contract. 11 live boards, 80 postings, ONE qualifying lead - Andela's own Data Analyst, North America, score 45, least-preferred family. Rejected: ashby(oyster, andela, terminal, deel[0], turing[0]), lever(toptal, remofirst, lemon[0], velocityglobal[0]), greenhouse(distantjob). The finding is categorical, not about these names: an EOR or talent marketplace's ATS board is its OWN corporate hiring (Oyster wants a Legal Counsel, Toptal wants an Enterprise SDR). The global-contract flow they exist to provide is their product, reached by joining a talent network, and never appears on a job board. Do not probe this category again - targets.json is the wrong mechanism for it. Remote-first PRODUCT companies that hire anywhere for their own roles are a different thing and do work: see _remote_first_2026_08_06, where Canonical is the prize.",
+
+  "_remote_first_2026_09_09": "Second remote-first round, after the EOR/marketplace category failed (see _global_hiring_rejected_2026_09_09). Probed 87 remote-first PRODUCT companies and games studios x 3 ATSes (261 pairs): 41 live boards, 1453 postings, 16 qualifying leads. Added 5. ashby:clickhouse is the prize - 'QA Engineer - Core Database (remote), EMEA' scored 133, tying n26 for the highest single score yet seen, and it is tier-2a remote. greenhouse:proton put a Senior iOS Test Automation Engineer (Skopje/Vilnius/Barcelona) at 127. ashby:langchain yielded five ai_qa roles at 54-60 on AI observability and evals - SF-located, but ai_qa is priority 3 and no other board produces that title. sentry and prefect are small boards carrying one good role each. NOT added: greenhouse:fivetran (209 postings for two US-located data_analyst roles at 47 - worst cost-to-shape ratio of the round). Confirms the shape rule: remote-first product companies pay, intermediaries do not.",
+  "_remote_first_rejected_2026_09_09": "Live endpoints, zero yield on the 2026-09-09 trial - do not re-add without a reason: ashby(cohere, temporal, deepl, 1password, synthesia, workos, braintrust, confluent, astronomer, percona, lightning, airbyte, resend, posthog, close, langfuse, neon, materialize, neptune, runway, weaviate, clerk, inngest, ghost, buffer, doppler), greenhouse(tailscale, cockroachlabs, galileo, mattermost, comet, ghost), lever(sonarsource, neon).",
+
+  "_greenhouse_gaming": "riotgames, epicgames, roblox, scopely, bungie, remedy - priority 4, and the only source of game-design roles.",
+  "_greenhouse_qa_eval": "testlio, turing, invisibletech, labelbox - QA outsourcers and data-labelling/eval shops, the closest match to the ai_qa and automation_qa variants.",
+  "_remote_first_2026_08_06": "canonical, alpaca, assemblyai, vrchat, coinmarketcap, metabase, camunda, livekit - drawn from realworkfromanywhere.com, which lists employers that hire with no country restriction (priority 2a). Canonical is the prize: ~300 openings, home-based EMEA, and a steady stream of QA and kernel-test roles. Of the 46 companies listed there, 30 had a live board and 43 boards were trial-scored: 778 postings yielded 6 qualifying leads, so the other 22 boards were deliberately left out - see _remote_first_rejected.",
+  "_remote_first_rejected": "supabase (58 openings, 0 qualify - Postgres/infra and GTM only), clutch, superside, offchainlabs, happyco, primer, atticus, modus, counterpart, railway, paradox, wishpond, parity, raya, zenrows, kindred, winona, collabora, chilipiper, kinsta, nethermind, fingerprint. All live endpoints, all zero-yield on the trial. Re-add if their hiring profile changes; volume is not the bottleneck, 4785 raw postings already yield ~5 leads a day.",
+  "_top": "moia - added 2026-08-13 after two hand-pasted JDs (Senior Vehicle Test Engineer, Senior Quality Specialist). Autonomous-mobility test engineering, Berlin/Hamburg/Munich - a preferred employer per priorities.md, not just a scored lead.",
+
+  "_studios_2026_08_21": "kolibrigames, moonactive, supercell, n26, photoroom, pennylane - added after probing 357 (ats, token) pairs for boards shaped like testlio: small, specialised, high ratio of QA/game/eval roles. Yields on the trial: kolibrigames 50% (2 of 4), photoroom 6.7%, moonactive 6.1%, supercell 4.4%, n26 1.3%, pennylane 0.8%. kolibrigames is the prize - Berlin, a four-posting board, and the employer of the 2026-08-20 application. n26 is Berlin too and put a 133-score Senior Software Quality Engineer on the trial sheet, the highest single score yet seen.",
+  "_studios_shape_note": "The trial's clearest finding is negative: every QA outsourcer and AI-data vendor probed yielded ZERO - qawolf, mabl, saucelabs, smartbear, surge-ai, prolific, toloka, snorkelai, handshake, remotasks, innodata, appen. Testlio's 20% is not the category, it is Testlio. Games studios are the seam that actually pays, so push there first when adding more. pennylane is the one addition against shape (130 postings for a single 48-score data role) - prune it first if the sheet gets noisy.",
+  "_studios_rejected_2026_08_21": "Live endpoints, zero yield on the trial - do not re-add without a reason: greenhouse(mabl, saucelabs, smartbear, prolific, toloka, snorkelai, remotasks, klanggames, wildlifestudios, remote, contentful, wise, remotecom, outfit7, tripledotstudios, housemarque), lever(innodata, appen, avalanchestudios, dreamgames, peakgames, pipedrive, swile, qonto, aircall, jamcity), ashby(qawolf, surge-ai, handshake, zapier, forto, sylvera, backmarket, qonto, alan, checkly). A second round of 78 further studio/QA-tooling names found only 5 live boards and no yield at all.",
+  "_gulf_2026_09_14": "The Gulf became a relocation target (priorities.md). Probed 106 Gulf employers x 3 ATSes (318 pairs): 12 live boards, 946 postings, 172 Gulf-located, ZERO qualifying Gulf leads. Nothing added. The scorer is not the problem - 167 of the 172 were sales/compliance/ops, rejected on role family. Live but zero-yield, do not re-add without a reason: greenhouse(okx, bybit, tamara, careem), lever(binance, aldar), ashby(rain, ziina, leantech). The Gulf's tech employers are on Workable and SmartRecruiters instead, which sources.py does not poll: the same probe there found workable(foodics, salla, lucidya, tamatem) and smartrecruiters(almosafer, seera, namshi, deliveryhero) live, with Foodics 'Associate AI Quality Engineer' and Almosafer 'Senior QA Engineer - Backend' in Riyadh on the day. Adding the Gulf meant adding those two fetchers, not more tokens here.",
+  "_workable_smartrecruiters": "Fetchers added 2026-09-14 for the Gulf. Polled: workable(foodics - the AI Quality Engineer role scored 138, the highest yet; salla - Saudi e-commerce SaaS with AI eval roles; tamatem - MENA mobile games publisher, priority 4), smartrecruiters(almosafer - Riyadh travel, a Senior QA Backend role on the day). Not added, zero QA-shaped Gulf roles on the probe: workable(lucidya), smartrecruiters(seera, namshi, deliveryhero). SmartRecruiters costs one request per posting for the description, so never add a large tenant there - deliveryhero alone is 100+.",
+
+  "greenhouse": [
+    "anthropic", "scaleai", "databricks", "elastic", "gitlab",
+    "grafanalabs", "mongodb", "discord",
+    "riotgames", "epicgames", "roblox", "scopely", "bungie", "remedy",
+    "testlio", "turing", "invisibletech", "labelbox",
+    "canonical", "alpaca", "assemblyai",
+    "proton",
+    "moia",
+    "n26"
+  ],
+
+  "lever": [
+    "mistral", "wealthsimple",
+    "vrchat", "coinmarketcap", "metabase",
+    "kolibrigames"
+  ],
+
+  "_ashby_ai": "openai moved here from Greenhouse; harvey/sierra/decagon/mercor are AI-product and eval companies. voodoo is a mobile-games publisher.",
+  "_ashby_studios": "moonactive and supercell are mobile f2p studios in the same seam as voodoo; photoroom and pennylane are Paris-based and surfaced product-analyst roles.",
+  "ashby": [
+    "ramp", "linear", "vercel", "replit", "browserbase", "elevenlabs",
+    "cursor", "modal",
+    "openai", "harvey", "sierra", "decagon", "notion", "mercor",
+    "voodoo",
+    "camunda", "livekit",
+    "moonactive", "supercell", "photoroom", "pennylane",
+    "clickhouse", "langchain", "sentry", "prefect"
+  ],
+
+  "workable": ["foodics", "salla", "tamatem"],
+
+  "smartrecruiters": ["almosafer"],
+
+  "adzuna": {
+    "_note": "Optional. Free key from https://developer.adzuna.com - set ADZUNA_APP_ID and ADZUNA_APP_KEY env vars. Skipped entirely if unset.",
+    "countries": ["gb", "de", "nl", "fr", "ca"],
+    "query": "AI QA test automation engineer remote"
+  }
+}

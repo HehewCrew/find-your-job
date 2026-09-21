@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jobtrack"
+version = "0.1.0"
+description = "A small CLI for tracking job applications."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+# Word COM, used by cv/build.py to export PDFs and to measure page counts.
+# Optional on purpose: without it the builders still produce .docx, they just
+# can't convert or enforce the two-page rule.
+pdf = [
+    "pywin32; sys_platform == 'win32'",
+]
+
+[project.scripts]
+jobtrack = "jobtrack.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jobtrack"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# `jobtrack` is installed (src layout), but `jobs` and `cv` are run in place with
+# `python -m jobs.scrape`. Without this, plain `pytest` cannot import them and only
+# `python -m pytest` works, because that form happens to put the cwd on sys.path.
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

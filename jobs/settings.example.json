@@ -1,0 +1,177 @@
+{
+  "_read_me": "TEMPLATE. Copy to jobs/settings.json (gitignored) and rewrite every section for your own search. Until you do, the scrape ranks jobs for the made-up person below: a QA / AI-testing engineer in Lisbon with an EU passport. Keys starting with _ are notes and are ignored. Every list of words is a list of PHRASES, matched case-insensitively on whole words: \"qa\" matches \"QA Engineer\" but not \"Qatar\"; a * means any letters, so \"game design*\" matches \"Game Designer\"; a phrase starting with re: is a raw regular expression (in JSON, write a word boundary as \\\\b).",
+
+  "you": {
+    "_note": "Where you are and where you may legally work. authorized_countries takes country names, or EU / EEA as shorthand. regions are the region words that include you - a posting saying 'EU only' or listing 'Europe' as its hiring region is open to you when the word is here.",
+    "home_country": "Portugal",
+    "home_places": ["portugal", "lisbon", "lisboa", "porto"],
+    "authorized_countries": ["EU"],
+    "regions": ["europe", "eu", "eea", "emea"],
+    "utc_offset": 0,
+    "years_experience": 4,
+    "needs_visa_sponsorship": false
+  },
+
+  "location": {
+    "_note": "on_site_at_home: 'ok' ranks office jobs where you live as their own tier; 'reject' drops them (for a search whose point is leaving). relocation_targets are places you would move to for an on-site role: list cities, or leave places empty to accept the whole country. accept_country_locks: countries where a 'hires only in X' list still stays on your sheet, penalised rather than dropped. A posting that names a UTC offset further than max_timezone_gap_hours from yours counts as locked.",
+    "on_site_at_home": "ok",
+    "relocation_targets": [
+      {"country": "Netherlands", "places": ["amsterdam", "rotterdam", "utrecht"]},
+      {"country": "Germany", "places": ["berlin", "munich", "münchen"]},
+      {"country": "Spain", "places": []}
+    ],
+    "accept_country_locks": [],
+    "max_timezone_gap_hours": 3,
+    "preferred_regions": ["europe", "european", "emea", "cet"]
+  },
+
+  "roles": [
+    {
+      "_note": "One entry per kind of job you would apply for, best first - the first matching role picks the CV. titles decide whether a posting is this role at all. cv is a variant name from cv/profile.json. cv_rules switch to another variant when the posting looks a certain way. max_level is intern, junior, mid, senior, lead or principal; above it the posting is penalised or, with above_level 'reject', dropped. internships: true, false, or the name of an interest that makes one worth it.",
+      "name": "ai_qa",
+      "titles": ["ai qa", "ai quality", "ai test*", "ai evaluat*", "llm eval*", "model eval*", "prompt engineer", "ai trainer", "red team*", "ai automation"],
+      "not_titles": ["software engineer", "backend engineer", "full stack engineer", "fullstack engineer", "research engineer"],
+      "not_titles_unless": ["qa"],
+      "cv": "ai_qa",
+      "cv_rules": [
+        {"title": ["ai automation", "llm automation", "ai ops", "agentic workflow*"], "cv": "ai_automation"}
+      ],
+      "points": 60,
+      "reason": "AI-QA-role",
+      "interest": "AI",
+      "max_level": "senior"
+    },
+    {
+      "name": "qa",
+      "titles": ["qa", "quality assurance", "quality engineer", "test engineer", "tester", "test analyst", "test automation", "sdet", "software engineer in test", "automation engineer"],
+      "cv": "automation_qa",
+      "cv_rules": [
+        {"interest": "gaming", "cv": "qa_gaming"},
+        {"title": ["sdet", "software engineer in test"], "cv": "sdet"}
+      ],
+      "points": 30,
+      "reason": "QA-title",
+      "max_level": "senior",
+      "internships": false,
+      "allow_excluded": ["devops"]
+    },
+    {
+      "name": "game_design",
+      "titles": ["game design*", "level design*", "gameplay design*", "systems design*", "narrative design*"],
+      "cv": "game_designer",
+      "points": 16,
+      "reason": "game-role",
+      "interest": "gaming",
+      "max_level": "junior",
+      "above_level": "reject",
+      "internships": true,
+      "junior_bonus": 14
+    },
+    {
+      "name": "game_data",
+      "titles": ["game analyst", "player analytics", "game data*"],
+      "cv": "game_data_analyst",
+      "points": 16,
+      "reason": "game-role",
+      "interest": "gaming",
+      "max_level": "senior"
+    },
+    {
+      "name": "data",
+      "titles": ["data analyst", "analytics engineer", "bi analyst", "business intelligence", "product analyst"],
+      "cv": "data_analyst",
+      "cv_rules": [{"interest": "gaming", "cv": "game_data_analyst"}],
+      "points": -15,
+      "reason": "data-role(least preferred)",
+      "waive_if_interest": "gaming",
+      "max_level": "senior"
+    }
+  ],
+
+  "_exclude_note": "exclude_titles drop a posting when they appear anywhere in its title - other professions, or stacks you do not work in. A role's allow_excluded lets one back in (a 'QA/DevOps Engineer' is still QA). exclude_departments only count at the start of the title: 'Data Analyst, Marketing' is a data job, 'Marketing Manager' is not yours.",
+  "exclude_titles": [
+    "machine learning engineer", "ml engineer", "data scientist", "research scientist",
+    "security engineer", "devops", "site reliability", "platform engineer",
+    "graphic designer", "ux designer", "ui designer", "product designer",
+    "engineering manager", "product manager", "project manager", "program manager",
+    "solutions architect", "support engineer", "technical writer",
+    "director", "head of", "vp of"
+  ],
+  "exclude_departments": [
+    "sales", "account executive", "account manager", "customer success", "recruit*",
+    "talent acquisition", "marketing", "finance", "legal"
+  ],
+
+  "interests": [
+    {
+      "_note": "Themes worth extra points wherever they appear. title_points when the title shows one, text_points when only the description or the company does. A role with the same interest already pays for it and does not collect it twice.",
+      "name": "AI",
+      "terms": ["agentic", "ai agent*", "llm*", "large language model*", "genai", "generative ai", "prompt*", "model evaluation", "copilot"],
+      "title_points": 35,
+      "text_points": 12
+    },
+    {
+      "name": "gaming",
+      "terms": ["game", "games", "gaming", "gameplay", "unity", "unreal", "game studio"],
+      "companies": ["ubisoft", "supercell", "rovio", "king", "riot games", "epic games", "paradox", "cd projekt", "larian", "games"],
+      "title_points": 12,
+      "text_points": 12
+    }
+  ],
+
+  "description_bonus": [
+    {"terms": ["python"], "points": 6},
+    {"terms": ["playwright", "pytest", "ci/cd", "test automation"], "points": 6}
+  ],
+
+  "_search_note": "What to search for on the job boards that need a query (Himalayas). Use the words your target job titles use.",
+  "search_queries": ["qa engineer", "quality assurance", "test automation", "sdet", "ai evaluation", "prompt engineer", "game designer", "data analyst"],
+
+  "scoring": {
+    "_note": "min_score is the bar a posting must clear to reach TODAY_SCRAPING.md. max_per_company stops one employer filling the sheet.",
+    "min_score": 45,
+    "max_per_company": 3
+  },
+
+  "tailoring": {
+    "_note": "skills is the whitelist a tailored CV may headline - name -> phrases that mean it in a job description. Leave it empty and the short skill names in your profile.json are used. gaps are things you do NOT have: never put on a CV, only reported so you can prepare. weak skills are real but never enough to headline a keyword block on their own.",
+    "skills": {
+      "Python": ["python"],
+      "SQL": ["sql"],
+      "Playwright": ["playwright"],
+      "CI/CD": ["ci/cd", "continuous integration", "continuous delivery"],
+      "Git": ["git", "version control"],
+      "Jira": ["jira"],
+      "Jenkins": ["jenkins"],
+      "REST APIs": ["rest api*", "restful"],
+      "API testing": ["api test*", "integration test*"],
+      "Test automation": ["test automation", "automated test*", "automation framework"],
+      "Test design": ["test design", "test case*", "test plan*", "test strateg*"],
+      "Regression testing": ["regression"],
+      "Defect management": ["defect*", "bug tracking", "triage"],
+      "Root-cause analysis": ["root cause"],
+      "Requirements analysis": ["requirement*"],
+      "Agile / Scrum": ["agile", "scrum", "kanban"],
+      "Prompt engineering": ["prompt engineer*", "prompting", "prompt design"],
+      "LLM evaluation": ["llm eval*", "model eval*", "evals", "hallucinat*"],
+      "Dashboards": ["dashboard*"],
+      "Written communication": ["written communication", "technical writing"],
+      "English": ["english"]
+    },
+    "gaps": {
+      "Java": ["re:\\bjava\\b(?!script)"],
+      "JavaScript / TypeScript": ["javascript", "typescript"],
+      "Docker / Kubernetes": ["docker", "kubernetes", "k8s"],
+      "AWS / GCP": ["aws", "gcp", "amazon web services", "google cloud"]
+    },
+    "weak": ["English", "Git", "Written communication"]
+  },
+
+  "llm": {
+    "_note": "Optional. Lets `python -m jobs.paste` ask a model to read a whole job description and say apply / consider / skip, then answer follow-up questions. Leave provider empty to stay rules-only. provider: anthropic (key from $ANTHROPIC_API_KEY, model defaults to claude-opus-5), openai (key from $OPENAI_API_KEY, set model), or openai-compatible (set base_url and model; api_key_env names the variable holding the key - OpenRouter, Groq, Mistral, or a local Ollama that needs none). The key is never read from this file.",
+    "provider": "",
+    "model": "",
+    "base_url": "",
+    "api_key_env": ""
+  }
+}
