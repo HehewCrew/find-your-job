@@ -21,6 +21,22 @@ OPEN_STATUSES: frozenset[str] = frozenset(
     {"wishlist", "applied", "screening", "interviewing", "offer"}
 )
 
+# An open application nobody has touched for this long has probably gone quiet: most companies
+# never send the rejection, so the status would otherwise read "applied" forever.
+QUIET_DAYS = 14
+
+# The fields an edit may change. id and the timestamps are the store's, notes have note().
+EDITABLE: tuple[str, ...] = (
+    "company",
+    "role",
+    "status",
+    "applied_on",
+    "url",
+    "location",
+    "salary",
+    "contact",
+)
+
 
 class ValidationError(ValueError):
     """Raised when user input does not describe a valid application."""
@@ -68,6 +84,38 @@ class Application:
     def days_since_applied(self, reference: date | None = None) -> int:
         ref = reference or date.today()
         return (ref - date.fromisoformat(self.applied_on)).days
+
+    def is_quiet(self, reference: date | None = None) -> bool:
+        """Open, and not updated in QUIET_DAYS or more."""
+        if not self.is_open:
+            return False
+        ref = reference or date.today()
+        return (ref - date.fromisoformat(self.updated_at[:10])).days >= QUIET_DAYS
+
+    def update(self, **fields: Any) -> list[str]:
+        """Change fields, validated as __post_init__ would. Returns "field=value" for each
+        real change; touches only if there was one. Nothing changes if anything is invalid."""
+        unknown = sorted(set(fields) - set(EDITABLE))
+        if unknown:
+            raise ValidationError(f"cannot edit {', '.join(unknown)}")
+        clean: dict[str, str] = {}
+        for name, raw in fields.items():
+            value = str(raw).strip() if name in ("company", "role") else str(raw)
+            if name in ("company", "role") and not value:
+                raise ValidationError(f"{name} must not be empty")
+            if name == "status":
+                value = normalize_status(value)
+            if name == "applied_on":
+                value = validate_date(value)
+            clean[name] = value
+        changed = []
+        for name, value in clean.items():
+            if getattr(self, name) != value:
+                setattr(self, name, value)
+                changed.append(f"{name}={value}")
+        if changed:
+            self.touch()
+        return changed
 
     def touch(self) -> None:
         self.updated_at = _now()
