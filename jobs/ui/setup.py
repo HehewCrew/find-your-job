@@ -112,15 +112,20 @@ def _cross_warnings(paths: Paths, files: dict) -> list[str]:
         return []
     variants = set(_read_json(paths.profile).get("variants", {}))
     s = st.from_dict(_read_json(paths.settings))
-    out = []
+    wanted: dict[str, list[str]] = {}  # missing CV -> the job types that send it
     for role in s.roles:
         for cv in [role.cv, *(rule.cv for rule in role.cv_rules)]:
-            if cv not in variants:
-                out.append(
-                    f"The job type '{role.name}' uses the CV '{cv}', which your profile does "
-                    f"not have. Add that CV, or pick one of: {', '.join(sorted(variants))}."
-                )
-    return out
+            if cv not in variants and role.name not in wanted.setdefault(cv, []):
+                wanted[cv].append(role.name)
+    if not wanted:
+        return []
+    listed = "; ".join(f"{cv} (for {', '.join(roles)})" for cv, roles in wanted.items())
+    # One warning, not one per role: after a guided start the example settings still name
+    # the example's eight CVs, and nine near-identical lines bury the one thing to do.
+    return [
+        f"Your settings send CVs your profile does not have: {listed}. Add them to your "
+        f"profile, or change those job types to a CV you have ({', '.join(sorted(variants))})."
+    ]
 
 
 def missing(paths: Paths) -> list[str]:
