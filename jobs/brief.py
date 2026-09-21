@@ -32,6 +32,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from jobs.errors import JobsError  # noqa: E402
 from jobs.score import dedupe_key  # noqa: E402
 from jobs.tailor import BRIEFS_HEADER, slugify  # noqa: E402
 from jobtrack.models import Application, ValidationError, today  # noqa: E402
@@ -229,6 +230,23 @@ def select(briefs: list[Brief], selectors: list[str]) -> list[Brief]:
             if b not in chosen:
                 chosen.append(b)
     return chosen
+
+
+@dataclass
+class MarkResult:
+    changed: list[Brief]
+    pending: int  # still pending after this mark
+
+
+def mark_briefs(path: Path, selectors: list[str], state: str, reason: str = "") -> MarkResult:
+    """Mark the selected briefs `state` in BRIEFS.md. Bad selectors raise ValidationError."""
+    lines, briefs = load(path)
+    if not briefs:
+        raise JobsError(f"No briefs in {path}.")
+    chosen = select(briefs, selectors)
+    path.write_text("\n".join(mark(lines, chosen, state, reason)) + "\n", encoding="utf-8")
+    left = sum(1 for b in briefs if b.state == PENDING and b not in chosen)
+    return MarkResult(chosen, left)
 
 
 # -- filing -------------------------------------------------------------
@@ -493,6 +511,65 @@ def _prune(folder: Path) -> None:
             folder.rmdir()
 
 
+class StillPending(JobsError):
+    """close refused: some briefs are neither applied nor aborted."""
+
+    def __init__(self, briefs: list[Brief]) -> None:
+        super().__init__(
+            f"{len(briefs)} brief(s) still pending. Mark them, or pass --force to "
+            "close anyway (pending briefs are discarded)."
+        )
+        self.briefs = briefs
+
+
+@dataclass
+class CloseResult:
+    filed: list[Filed]
+    dropped: list[tuple[Brief, int]]
+    swept: list[Path]  # every file removed from cv/out/tailored/ - a CV may be two
+    log_path: Path
+    dry_run: bool
+
+
+def close(
+    path: Path,
+    root: Path,
+    store: Store,
+    *,
+    force: bool = False,
+    keep_cvs: bool = False,
+    dry_run: bool = False,
+) -> CloseResult:
+    """File every applied brief, withdraw every aborted one, log the day, empty BRIEFS.md.
+
+    Every mutation happens here, before the caller reports anything: console encoding
+    varies (a legacy Windows codepage raises on the em dash in a posting title), and a
+    crash while reporting must never leave the store unsaved on top of folders written.
+    """
+    _, briefs = load(path)
+    applied = [b for b in briefs if b.state == APPLIED]
+    aborted = [b for b in briefs if b.state == ABORTED]
+    still_pending = [b for b in briefs if b.state not in (APPLIED, ABORTED)]
+    if not applied and not aborted:
+        raise JobsError("Nothing marked applied or aborted yet.")
+    if still_pending and not force:
+        raise StillPending(still_pending)
+
+    when = today()
+    log = root / FOLDER / "LOG.md"
+    filed = [file_brief(b, store, root, dry_run=dry_run) for b in applied]
+    dropped = [(b, abandon(b, store, dry_run=dry_run)) for b in aborted]
+    swept: list[Path] = []
+    if not dry_run:
+        store.save()
+        write_log(log_entry(filed, aborted, when), log, when)
+        # Sweep before emptying: the briefs are what say which CVs these were.
+        if not keep_cvs:
+            swept = sweep_tailored(filed, aborted)
+        empty_briefs(path)
+    return CloseResult(filed, dropped, swept, log, dry_run)
+
+
 # -- commands -----------------------------------------------------------
 
 
@@ -531,71 +608,59 @@ def cmd_list(args: argparse.Namespace, briefs: list[Brief]) -> int:
 
 
 def cmd_mark(args: argparse.Namespace, briefs: list[Brief]) -> int:
-    if not briefs:
-        print(f"No briefs in {args.briefs}.", file=sys.stderr)
+    try:
+        result = mark_briefs(args.briefs, args.selectors, args.state, args.reason)
+    except JobsError as exc:
+        print(exc, file=sys.stderr)
         return 1
-    lines, _ = load(args.briefs)
-    chosen = select(briefs, args.selectors)
-    args.briefs.write_text(
-        "\n".join(mark(lines, chosen, args.state, args.reason)) + "\n", encoding="utf-8"
-    )
-    for b in chosen:
+    for b in result.changed:
         print(f"{args.state}: {b.label}" + (f" ({args.reason})" if args.reason else ""))
-    left = sum(1 for b in briefs if b.state == PENDING and b not in chosen)
-    print(f"{left} still pending." if left else "All marked. Next: python -m jobs.brief close")
+    print(
+        f"{result.pending} still pending."
+        if result.pending
+        else "All marked. Next: python -m jobs.brief close"
+    )
     return 0
 
 
 def cmd_close(args: argparse.Namespace, briefs: list[Brief]) -> int:
-    applied = [b for b in briefs if b.state == APPLIED]
-    aborted = [b for b in briefs if b.state == ABORTED]
-    still_pending = [b for b in briefs if b.state not in (APPLIED, ABORTED)]
-    if not applied and not aborted:
-        print("Nothing marked applied or aborted yet.", file=sys.stderr)
-        return 1
-    if still_pending and not args.force:
-        for b in still_pending:
-            print(f"  unmarked: {b.label}", file=sys.stderr)
-        print(
-            f"{len(still_pending)} brief(s) still pending. Mark them, or pass --force to "
-            "close anyway (pending briefs are discarded).",
-            file=sys.stderr,
-        )
-        return 1
-
     store = Store(args.file or default_path())
-    when = today()
-    log = args.root / FOLDER / "LOG.md"
+    try:
+        result = close(
+            args.briefs,
+            args.root,
+            store,
+            force=args.force,
+            keep_cvs=args.keep_cvs,
+            dry_run=args.dry_run,
+        )
+    except StillPending as exc:
+        for b in exc.briefs:
+            print(f"  unmarked: {b.label}", file=sys.stderr)
+        print(exc, file=sys.stderr)
+        return 1
+    except JobsError as exc:
+        print(exc, file=sys.stderr)
+        return 1
 
-    # Every mutation happens before the first print. Console encoding varies (a legacy
-    # Windows codepage raises on the em dash in a posting title), and a crash while
-    # reporting must never leave the store unsaved on top of folders already written.
-    filed = [file_brief(b, store, args.root, dry_run=args.dry_run) for b in applied]
-    dropped = [(b, abandon(b, store, dry_run=args.dry_run)) for b in aborted]
-    swept: list[Path] = []
-    if not args.dry_run:
-        store.save()
-        write_log(log_entry(filed, aborted, when), log, when)
-        # Sweep before emptying: the briefs are what say which CVs these were.
-        if not args.keep_cvs:
-            swept = sweep_tailored(filed, aborted)
-        empty_briefs(args.briefs)
-
-    for f in filed:
+    for f in result.filed:
         print(f"{FOLDER}/{f.brief.folder}/  <- jobtrack #{f.app_id}, CV {f.brief.variant}")
         if f.kept_answers:
             print("    answers already on file, kept as they are")
         for problem in f.problems:
             print(f"    !  {problem}")
-    for b, app_id in dropped:
+    for b, app_id in result.dropped:
         print(f"not pursued: {b.label} (jobtrack #{app_id} -> withdrawn)")
 
-    if args.dry_run:
+    if result.dry_run:
         print("\n--dry-run: nothing written.")
         return 0
-    print(f"\nLogged {len(filed)} application(s) to {log.relative_to(args.root)}")
-    if swept:
-        print(f"Cleared {len(swept)} tailored CV(s); the ones you sent are in {FOLDER}/.")
+    logged = result.log_path.relative_to(args.root)
+    print(f"\nLogged {len(result.filed)} application(s) to {logged}")
+    # A CV is its .docx and, when an engine made one, its .pdf - count CVs, not files.
+    cleared = len({p.with_suffix("") for p in result.swept})
+    if cleared:
+        print(f"Cleared {cleared} tailored CV(s); the ones you sent are in {FOLDER}/.")
     print(f"{args.briefs.name} is empty and ready for tomorrow's scrape.")
     return 0
 
