@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js" defer></script>
 <script src="/static/setup.js" defer></script>
+<script src="/static/apps.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -56,13 +57,7 @@
   </section>
 
   <section id="tab-apps" hidden>
-    <div class="empty panel">
-      <h2>Every application, in one list</h2>
-      <p>Searching, filtering and updating your applications comes to this page in a later version. Until then, the command line has all of it:</p>
-      <pre>jobtrack list --open
-jobtrack show 12
-jobtrack update 12 --status interviewing</pre>
-    </div>
+    <div id="apps-view"><p class="muted">Loading…</p></div>
   </section>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>

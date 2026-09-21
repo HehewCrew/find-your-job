@@ -249,3 +249,20 @@ input[type="text"] {
   position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--rule);
   padding-block: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
 }
+
+/* applications */
+.chips .btn { font-size: 13px; padding: 4px 10px; }
+.chips .btn[aria-pressed="true"] { background: var(--sig-wash); border-color: var(--sig); color: var(--sig); font-weight: 700; }
+.filters { align-items: center; }
+.filters input[type="text"] { min-width: min(320px, 100%); }
+.app-row { grid-template-columns: 7.5em minmax(0, 1fr) auto; }
+.app-row .when { color: var(--ink-soft); font-size: 13px; }
+.pill { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.pill.offer, .pill.interviewing, .pill.screening { color: var(--take); }
+.pill.applied { color: var(--sig); }
+.pill.rejected, .pill.withdrawn { color: var(--drop); }
+.quiet { color: var(--warn); font-weight: 700; }
+.notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.detail h3 { font-size: 15px; margin: 8px 0 0; }
+.btn.danger { color: var(--bad); }
+.btn.danger:hover:not(:disabled) { border-color: var(--bad); }
