@@ -196,7 +196,14 @@ def _run(monkeypatch, tmp_path, verdict: str, *extra: str) -> tuple[int, list]:
     _with_client(monkeypatch, FakeClient(json.dumps({"decision": verdict})))
     monkeypatch.setattr(settings, "current", lambda: cfg())
     built: list = []
-    monkeypatch.setattr(paste.tl, "fit", lambda t: (built.append(t) or [], 0, len(t["matched"])))
+    monkeypatch.setattr(
+        paste.tl,
+        "fit",
+        lambda t, report=None: (
+            built.append(t)
+            or paste.tl.CvResult(t["company"], t["variant"], keywords_kept=len(t["matched"]))
+        ),
+    )
     monkeypatch.setattr(paste.tl, "write_jd", lambda *a, **k: None)
     monkeypatch.setattr(paste.sys.stdin, "isatty", lambda: False, raising=False)
     jd = tmp_path / "jd.txt"

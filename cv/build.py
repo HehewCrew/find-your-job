@@ -30,6 +30,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -328,7 +329,9 @@ def render_entry(d: Docx, entry: dict, tag: str, links: dict, *, show_keywords=T
             )
 
 
-def build_variant(profile: dict, tag: str, tailor: dict | None = None) -> tuple[Path, str]:
+def build_variant(
+    profile: dict, tag: str, tailor: dict | None = None, warnings: list[str] | None = None
+) -> tuple[Path, str]:
     """Render one variant. `tailor` optionally targets it at a specific posting:
     {company, job_title, matched: [...], slug} - `matched` must only ever contain
     skills you actually have, so tailoring stays honest."""
@@ -414,10 +417,10 @@ def build_variant(profile: dict, tag: str, tailor: dict | None = None) -> tuple[
         if entry.get("draft"):
             continue
         if not pick(entry.get("bullets", []), tag):
-            print(
+            _warn(
                 f"  ! {tag}: role '{entry['id']}' has no bullets tagged '{tag}' - "
                 f"it will be MISSING from the timeline",
-                file=sys.stderr,
+                warnings,
             )
         render_entry(d, entry, tag, links, show_keywords=show_keywords)
 
@@ -473,19 +476,26 @@ MAX_PAGES = 2
 _WD_STATISTIC_PAGES = 2
 
 
-def _report_oversized(oversized: list[tuple[Path, int]], warn: bool) -> None:
+def _warn(message: str, warnings: list[str] | None) -> None:
+    """Print to stderr as before, or collect for a caller that reports it itself."""
+    if warnings is None:
+        print(message, file=sys.stderr)
+    else:
+        warnings.append(message.strip())
+
+
+def _report_oversized(
+    oversized: list[tuple[Path, int]], warn: bool, warnings: list[str] | None = None
+) -> None:
     if not (oversized and warn):
         return
-    print(
+    _warn(
         f"\n  !! {len(oversized)} CV(s) OVER THE {MAX_PAGES}-PAGE LIMIT - do not send:",
-        file=sys.stderr,
+        warnings,
     )
     for path, pages in oversized:
-        print(f"     {pages} pages: {path.name}", file=sys.stderr)
-    print(
-        "     Fix by lowering meta.density in cv/profile.json, or cutting a bullet.",
-        file=sys.stderr,
-    )
+        _warn(f"     {pages} pages: {path.name}", warnings)
+    _warn("     Fix by lowering meta.density in cv/profile.json, or cutting a bullet.", warnings)
 
 
 def _word_to_pdf(
@@ -494,6 +504,8 @@ def _word_to_pdf(
     keep_docx: bool,
     pages_out: dict[Path, int] | None,
     warn: bool,
+    warnings: list[str] | None = None,
+    engines_out: dict[Path, str] | None = None,
 ) -> list[Path]:
     """Convert .docx -> .pdf via Word COM. Returns what succeeded.
 
@@ -503,13 +515,18 @@ def _word_to_pdf(
     hiccup on one file doesn't erase that variant's only output.
     """
     try:
-        import pythoncom  # noqa: F401
+        import pythoncom
         import win32com.client
     except ImportError:
         return []
 
     made: list[Path] = []
     oversized: list[tuple[Path, int]] = []
+    # COM must be initialised per thread. The CLI runs on the main thread, where pywin32
+    # already did it; a UI worker thread is not, and Word fails there without this.
+    off_main = threading.current_thread() is not threading.main_thread()
+    if off_main:
+        pythoncom.CoInitialize()
     word = None
     try:
         word = win32com.client.DispatchEx("Word.Application")
@@ -521,6 +538,8 @@ def _word_to_pdf(
             try:
                 doc.SaveAs2(str(dst), FileFormat=17)  # 17 = wdFormatPDF
                 made.append(dst)
+                if engines_out is not None:
+                    engines_out[dst] = "word"
                 pages = int(doc.ComputeStatistics(_WD_STATISTIC_PAGES))
                 if pages_out is not None:
                     pages_out[dst] = pages
@@ -533,12 +552,14 @@ def _word_to_pdf(
                     src.unlink()
     except Exception as exc:  # noqa: BLE001
         if warn:
-            print(f"  ! Word PDF conversion failed: {exc}", file=sys.stderr)
+            _warn(f"  ! Word PDF conversion failed: {exc}", warnings)
     finally:
         if word is not None:
             with contextlib.suppress(Exception):
                 word.Quit()
-    _report_oversized(oversized, warn)
+        if off_main:
+            pythoncom.CoUninitialize()
+    _report_oversized(oversized, warn, warnings)
     return made
 
 
@@ -582,6 +603,8 @@ def _libreoffice_to_pdf(
     keep_docx: bool,
     pages_out: dict[Path, int] | None,
     warn: bool,
+    warnings: list[str] | None = None,
+    engines_out: dict[Path, str] | None = None,
 ) -> list[Path]:
     """Convert .docx -> .pdf via headless LibreOffice. Returns what succeeded.
 
@@ -613,16 +636,16 @@ def _libreoffice_to_pdf(
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             if warn:
-                print(f"  ! LibreOffice conversion failed for {src.name}: {exc}", file=sys.stderr)
+                _warn(f"  ! LibreOffice conversion failed for {src.name}: {exc}", warnings)
             continue
         if result.returncode != 0 or not dst.exists():
             if warn:
                 detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
-                print(
-                    f"  ! LibreOffice conversion failed for {src.name}: {detail}", file=sys.stderr
-                )
+                _warn(f"  ! LibreOffice conversion failed for {src.name}: {detail}", warnings)
             continue
         made.append(dst)
+        if engines_out is not None:
+            engines_out[dst] = "libreoffice"
         pages = _count_pdf_pages(dst)
         if pages is None:
             unknown_pages.append(dst)
@@ -636,11 +659,11 @@ def _libreoffice_to_pdf(
                 src.unlink()
     if unknown_pages and warn:
         names = ", ".join(p.name for p in unknown_pages)
-        print(
+        _warn(
             f"  ? page count undetectable (LibreOffice export) for: {names} - check by hand.",
-            file=sys.stderr,
+            warnings,
         )
-    _report_oversized(oversized, warn)
+    _report_oversized(oversized, warn, warnings)
     return made
 
 
@@ -650,6 +673,8 @@ def to_pdf(
     keep_docx: bool = False,
     pages_out: dict[Path, int] | None = None,
     warn: bool = True,
+    warnings: list[str] | None = None,
+    engines_out: dict[Path, str] | None = None,
 ) -> list[Path]:
     """Convert .docx -> .pdf, preferring Word and falling back to LibreOffice.
 
@@ -666,23 +691,36 @@ def to_pdf(
     `warn=False` silences the over-length report for callers doing exactly that: an
     intermediate attempt being too long is the mechanism working, not a fault, and
     printing the warning once per attempt buries the one result that matters.
+
+    `warnings`, if given, collects every message instead of printing it. `engines_out` is
+    filled with {pdf path: "word" | "libreoffice"}.
     """
     if not paths:
         return []
-    made = _word_to_pdf(paths, keep_docx=keep_docx, pages_out=pages_out, warn=warn)
+    made = _word_to_pdf(
+        paths,
+        keep_docx=keep_docx,
+        pages_out=pages_out,
+        warn=warn,
+        warnings=warnings,
+        engines_out=engines_out,
+    )
     remaining = [p for p in paths if p.exists() and p.with_suffix(".pdf") not in made]
     if not remaining:
         return made
     soffice = _find_soffice()
     if soffice is None:
         if warn and not made:
-            print(
-                "  ! neither Word nor LibreOffice is available - skipping PDF step",
-                file=sys.stderr,
-            )
+            _warn("  ! neither Word nor LibreOffice is available - skipping PDF step", warnings)
         return made
     made += _libreoffice_to_pdf(
-        remaining, soffice=soffice, keep_docx=keep_docx, pages_out=pages_out, warn=warn
+        remaining,
+        soffice=soffice,
+        keep_docx=keep_docx,
+        pages_out=pages_out,
+        warn=warn,
+        warnings=warnings,
+        engines_out=engines_out,
     )
     return made
 

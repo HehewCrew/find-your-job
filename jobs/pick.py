@@ -162,7 +162,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nTailoring {len(tailors)} CV(s)…")
         for t in tailors:
             wanted = len(t["matched"])
-            made, pages, kept = tl.fit(t)
+            r = tl.fit(t)
+            made, pages, kept = ([r.pdf] if r.pdf else []), r.pages or 0, r.keywords_kept
             note = ""
             if kept < wanted:
                 note = f"  (trimmed {wanted}->{kept} keywords to hold {tl.MAX_PAGES} pages)"

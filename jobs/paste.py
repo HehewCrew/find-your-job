@@ -363,7 +363,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     wanted = len(t["matched"])
-    made, pages, kept = tl.fit(t)
+    r = tl.fit(t)
+    made, pages, kept = ([r.pdf] if r.pdf else []), r.pages or 0, r.keywords_kept
     if kept < wanted:
         # The brief is written from `t` after this, so it reports what the CV really says.
         detail = (
