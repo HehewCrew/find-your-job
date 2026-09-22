@@ -4,6 +4,25 @@ Find job postings that fit you, build a CV tailored to each one, and keep track 
 application - from a page in your browser, on your own computer. Free, and nothing leaves
 your machine unless you choose to use an AI verdict with your own key.
 
+A free, local alternative to paid job-hunt tools like Teal, Jobscan or Huntr: no account, no
+subscription, and your CV never goes to anyone's server.
+
+<!-- TODO: demo GIF here - scrape -> tick leads -> tailored CV built, ~15 s.
+     ![Find Your Job in action](docs/demo.gif) -->
+
+- **Finds leads** from public job boards (RemoteOK, Remotive, We Work Remotely,
+  Himalayas, and company boards on Greenhouse, Lever and Ashby), and ranks them against what
+  you told it you want.
+- **Builds a tailored CV** for each posting you keep, from one set of facts about you, and
+  holds it to two pages.
+- **Tracks every application** - applied, interviewing, quiet for two weeks - in one place.
+
+**What it doesn't do:** it never applies for you. You read each posting, you decide, you
+click apply. It's a tool for sending fewer, better applications, not a mass-apply bot.
+
+**Best for** tech and remote jobs, since that's what those boards list. Postings from anywhere
+else (LinkedIn, a referral) can be pasted in by hand.
+
 ## Get started
 
 1. **Install Python 3.10 or newer** from [python.org](https://www.python.org/downloads/).
