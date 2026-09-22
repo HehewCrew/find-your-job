@@ -7,8 +7,9 @@ your machine unless you choose to use an AI verdict with your own key.
 A free, local alternative to paid job-hunt tools like Teal, Jobscan or Huntr: no account, no
 subscription, and your CV never goes to anyone's server.
 
-<!-- TODO: demo GIF here - scrape -> tick leads -> tailored CV built, ~15 s.
-     ![Find Your Job in action](docs/demo.gif) -->
+![Find Your Job: scrape, tick the leads worth having, build a tailored CV for each](docs/demo.gif)
+
+<sub>The demo runs on the made-up person in the example files.</sub>
 
 - **Finds leads** from public job boards (RemoteOK, Remotive, We Work Remotely,
   Himalayas, and company boards on Greenhouse, Lever and Ashby), and ranks them against what
