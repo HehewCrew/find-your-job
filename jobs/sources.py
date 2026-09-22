@@ -209,7 +209,8 @@ def _as_list(value) -> list[str]:
 
 
 def _strip_html(text: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", text or "")
+    # Greenhouse entity-escapes its HTML, so its tags only exist after one unescape.
+    text = re.sub(r"<[^>]+>", " ", html.unescape(text or ""))
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 

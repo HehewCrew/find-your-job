@@ -427,3 +427,17 @@ def test_smartrecruiters_survives_one_failing_description(monkeypatch):
     broken, fine = sources.smartrecruiters("almosafer")
     assert (broken.title, broken.description) == ("QA Engineer", "")
     assert fine.description == "Automate."
+
+
+def test_strip_html_removes_tags():
+    assert sources._strip_html("<p>Ship <b>fast</b> &amp; often</p>") == "Ship fast & often"
+
+
+def test_greenhouse_description_has_no_escaped_tags(monkeypatch):
+    """Greenhouse sends content entity-escaped. Stripping tags before unescaping found none,
+    then turned every &lt;h2&gt; into a real tag - the Review panel showed raw HTML."""
+    content = "&lt;h2&gt;About Testlio&lt;/h2&gt; &lt;p&gt;Ship faster &amp;amp; better.&lt;/p&gt;"
+    board = {"jobs": [{"title": "QA Tester", "absolute_url": "u", "content": content}]}
+    monkeypatch.setattr(sources, "_json", lambda url: board)
+    (posting,) = sources.greenhouse("testlio")
+    assert posting.description == "About Testlio Ship faster & better."
