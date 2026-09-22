@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
 
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
     # flush: when this runs under a launcher or a pipe, buffered output would hide the address.
-    print(f"Find Your Job is running at {url}", flush=True)
+    print(f"jobHunt is running at {url}", flush=True)
     print("Press Ctrl+C here to stop it, or close this window.", flush=True)
     if not args.no_browser:
         webbrowser.open(url)

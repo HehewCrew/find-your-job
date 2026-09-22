@@ -1,4 +1,4 @@
-# Find Your Job
+# jobHunt
 
 Find job postings that fit you, build a CV tailored to each one, and keep track of every
 application - from a page in your browser, on your own computer. Free, and nothing leaves
@@ -7,7 +7,7 @@ your machine unless you choose to use an AI verdict with your own key.
 A free, local alternative to paid job-hunt tools like Teal, Jobscan or Huntr: no account, no
 subscription, and your CV never goes to anyone's server.
 
-![Find Your Job: scrape, tick the leads worth having, build a tailored CV for each](docs/demo.gif)
+![jobHunt: scrape, tick the leads worth having, build a tailored CV for each](docs/demo.gif)
 
 <sub>The demo runs on the made-up person in the example files.</sub>
 
@@ -28,7 +28,7 @@ else (LinkedIn, a referral) can be pasted in by hand.
 
 1. **Install Python 3.10 or newer** from [python.org](https://www.python.org/downloads/).
    On Windows, tick **"Add python.exe to PATH"** in the installer.
-2. **Get Find Your Job:** click the green **Code** button on this page, then
+2. **Get jobHunt:** click the green **Code** button on this page, then
    **Download ZIP**, and unzip it somewhere you'll find it again (Documents is fine).
    Or, if you use git: `git clone` this repository.
 3. **Start it:**

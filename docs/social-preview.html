@@ -1,7 +1,9 @@
 <!doctype html>
 <!-- Source for social-preview.png (GitHub Settings -> Social preview, 1280x640).
-     Re-render: msedge --headless --window-size=1280,640 --screenshot=social-preview.png social-preview.html -->
-<html><head><meta charset="utf-8"><title>Find Your Job</title>
+     Re-render: msedge --headless --disable-gpu --hide-scrollbars --window-size=1280,640
+       --screenshot=<abs path>/social-preview.png file:///<abs path>/social-preview.html
+     Both paths must be absolute: a bare filename is read as a host name, not a file. -->
+<html><head><meta charset="utf-8"><title>jobHunt</title>
 <style>
 @font-face { font-family: A; src: url("../jobs/ui/static/fonts/AtkinsonHyperlegible-Regular.woff2"); font-weight: 400; }
 @font-face { font-family: A; src: url("../jobs/ui/static/fonts/AtkinsonHyperlegible-Bold.woff2"); font-weight: 700; }
@@ -25,7 +27,7 @@ p { font-size: 30px; line-height: 1.35; color: #5B6472; max-width: 620px; }
 </style></head><body>
 <div>
   <div class="kicker">Open source &middot; Free</div>
-  <h1>Find Your Job</h1>
+  <h1>jobHunt</h1>
   <p>Find postings that fit you, tailor a CV to each one, and track every application.</p>
   <div class="chips"><div class="chip">Runs on your computer</div><div class="chip">No account</div><div class="chip">No subscription</div></div>
 </div>

@@ -69,7 +69,7 @@ class NotFound(Exception):
 
 class _Handler(BaseHTTPRequestHandler):
     app: App  # set per server by make_server
-    server_version = "FindYourJob"
+    server_version = "jobHunt"
     protocol_version = "HTTP/1.0"
 
     def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib signature

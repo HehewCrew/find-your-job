@@ -1,8 +1,8 @@
 @echo off
-rem Find Your Job - double-click to start. The first run sets everything up.
+rem jobHunt - double-click to start. The first run sets everything up.
 setlocal
 cd /d "%~dp0"
-title Find Your Job
+title jobHunt
 
 rem --- 1. Python 3.10 or newer --------------------------------------------------------
 set "PY="
@@ -11,7 +11,7 @@ if not defined PY (
   where python >nul 2>nul && python -c "import sys; sys.exit(sys.version_info < (3, 10))" >nul 2>nul && set "PY=python"
 )
 if not defined PY (
-  echo Find Your Job needs Python 3.10 or newer, and this computer does not have it yet.
+  echo jobHunt needs Python 3.10 or newer, and this computer does not have it yet.
   echo.
   echo  1. Download it from https://www.python.org/downloads/
   echo  2. In the installer, tick "Add python.exe to PATH" before clicking Install.
@@ -23,7 +23,7 @@ if not defined PY (
 
 rem --- 2. A private environment for the app, created once ----------------------------
 if not exist ".venv\Scripts\python.exe" (
-  echo Setting up Find Your Job for the first time. This takes a minute...
+  echo Setting up jobHunt for the first time. This takes a minute...
   %PY% -m venv .venv || goto failed
 )
 
@@ -42,7 +42,7 @@ exit /b 0
 
 :failed
 echo.
-echo Find Your Job could not start. The message above says why.
+echo jobHunt could not start. The message above says why.
 echo If you need help, open an issue on the project's GitHub page and paste that message.
 pause
 exit /b 1
