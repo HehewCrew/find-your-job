@@ -1,4 +1,4 @@
-// Find Your Job - Applications: every application in jobtrack, filterable, editable.
+// jobHunt - Applications: every application in jobtrack, filterable, editable.
 // Uses api(), toast() and $() from app.js and h() from setup.js.
 "use strict";
 

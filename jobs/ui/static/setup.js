@@ -1,4 +1,4 @@
-// Find Your Job - Setup. Draws a form from each personal file itself, guided by the small
+// jobHunt - Setup. Draws a form from each personal file itself, guided by the small
 // schema the server sends, and saves the whole object back so keys the form never shows
 // survive. Uses api(), esc(), toast(), runTask() and showTab() from app.js.
 "use strict";

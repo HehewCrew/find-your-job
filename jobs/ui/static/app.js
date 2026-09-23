@@ -1,4 +1,4 @@
-// Find Your Job - the page. A thin renderer over the local API: every action goes to the
+// jobHunt - the page. A thin renderer over the local API: every action goes to the
 // server, then the page re-reads state, so the sheet and briefs on disk stay the truth.
 "use strict";
 

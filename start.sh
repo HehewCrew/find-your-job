@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Find Your Job - start the web page. The first run sets everything up.
+# jobHunt - start the web page. The first run sets everything up.
 #   ./start.sh                 (macOS users can double-click start.command instead)
 #   ./start.sh --port 9000     (any option of `python -m jobs.ui` passes through)
 set -e
@@ -15,7 +15,7 @@ for candidate in python3 python; do
   fi
 done
 if [ -z "$PY" ]; then
-  echo "Find Your Job needs Python 3.10 or newer, and this computer does not have it yet."
+  echo "jobHunt needs Python 3.10 or newer, and this computer does not have it yet."
   echo
   echo "  macOS:          download it from https://www.python.org/downloads/"
   echo "  Ubuntu/Debian:  sudo apt install python3 python3-venv"
@@ -27,7 +27,7 @@ fi
 
 # --- 2. A private environment for the app, created once ------------------------------
 if [ ! -x .venv/bin/python ]; then
-  echo "Setting up Find Your Job for the first time. This takes a minute..."
+  echo "Setting up jobHunt for the first time. This takes a minute..."
   if ! "$PY" -m venv .venv; then
     rm -rf .venv
     echo
