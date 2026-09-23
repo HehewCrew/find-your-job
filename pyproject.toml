@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "find-your-job"
+name = "jobhunt"
 version = "0.2.0"
 description = "Find job postings that fit you, tailor a CV to each, and track every application - locally."
 readme = "README.md"
